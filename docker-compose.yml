@@ -1,0 +1,509 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # Database & Cache Services
+  # ==========================================
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: skep-postgres
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-skep_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
+      POSTGRES_DB: ${DB_NAME:-skep_db}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    command: postgres -c max_connections=200
+    ports:
+      - "${DB_EXTERNAL_PORT:-15433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-skep_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: skep-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_EXTERNAL_PORT:-16379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================
+  # Mock External Services
+  # ==========================================
+  ocr-service:
+    build:
+      context: ./services/ocr-service
+      dockerfile: Dockerfile
+    container_name: skep-ocr-service
+    environment:
+      NODE_ENV: ${ENVIRONMENT:-dev}
+      PORT: ${OCR_SERVICE_PORT:-9089}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${OCR_SERVICE_PORT:-9089}:${OCR_SERVICE_PORT:-9089}"
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${OCR_SERVICE_PORT:-9089}/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  govapi-service:
+    build:
+      context: ./services/govapi-service
+      dockerfile: Dockerfile
+    container_name: skep-govapi-service
+    environment:
+      NODE_ENV: ${ENVIRONMENT:-dev}
+      PORT: ${GOVAPI_SERVICE_PORT:-9090}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${GOVAPI_SERVICE_PORT:-9090}:${GOVAPI_SERVICE_PORT:-9090}"
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${GOVAPI_SERVICE_PORT:-9090}/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================
+  # Spring Boot Microservices
+  # ==========================================
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: skep-api-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${API_GATEWAY_PORT:-8080}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-your-256bit-base64-encoded-secret-key-here}
+      JWT_EXPIRATION: ${JWT_EXPIRATION_HOURS:-24}
+
+      # AWS
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-skep-documents-dev}
+
+      # Services
+      OCR_SERVICE_URL: ${OCR_SERVICE_URL:-http://ocr-service:9089}
+      GOVAPI_SERVICE_URL: ${GOVAPI_SERVICE_URL:-http://govapi-service:9090}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${API_GATEWAY_PORT:-9080}:${API_GATEWAY_PORT:-9080}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${API_GATEWAY_PORT:-8080}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: skep-auth-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${AUTH_SERVICE_PORT:-8081}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-your-256bit-base64-encoded-secret-key-here}
+      JWT_EXPIRATION: ${JWT_EXPIRATION_HOURS:-24}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${AUTH_SERVICE_PORT:-9081}:${AUTH_SERVICE_PORT:-9081}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${AUTH_SERVICE_PORT:-8081}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  document-service:
+    build:
+      context: ./services/document-service
+      dockerfile: Dockerfile
+    container_name: skep-document-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${DOCUMENT_SERVICE_PORT:-8082}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # AWS S3
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-skep-documents-dev}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${DOCUMENT_SERVICE_PORT:-9082}:${DOCUMENT_SERVICE_PORT:-9082}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${DOCUMENT_SERVICE_PORT:-8082}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  equipment-service:
+    build:
+      context: ./services/equipment-service
+      dockerfile: Dockerfile
+    container_name: skep-equipment-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${EQUIPMENT_SERVICE_PORT:-8083}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${EQUIPMENT_SERVICE_PORT:-9083}:${EQUIPMENT_SERVICE_PORT:-9083}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${EQUIPMENT_SERVICE_PORT:-8083}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  dispatch-service:
+    build:
+      context: ./services/dispatch-service
+      dockerfile: Dockerfile
+    container_name: skep-dispatch-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${DISPATCH_SERVICE_PORT:-8084}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${DISPATCH_SERVICE_PORT:-9084}:${DISPATCH_SERVICE_PORT:-9084}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${DISPATCH_SERVICE_PORT:-8084}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  inspection-service:
+    build:
+      context: ./services/inspection-service
+      dockerfile: Dockerfile
+    container_name: skep-inspection-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${INSPECTION_SERVICE_PORT:-8085}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${INSPECTION_SERVICE_PORT:-9085}:${INSPECTION_SERVICE_PORT:-9085}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${INSPECTION_SERVICE_PORT:-8085}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  settlement-service:
+    build:
+      context: ./services/settlement-service
+      dockerfile: Dockerfile
+    container_name: skep-settlement-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${SETTLEMENT_SERVICE_PORT:-8086}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${SETTLEMENT_SERVICE_PORT:-9086}:${SETTLEMENT_SERVICE_PORT:-9086}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${SETTLEMENT_SERVICE_PORT:-8086}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: skep-notification-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${NOTIFICATION_SERVICE_PORT:-8087}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # FCM
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY:-}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-9087}:${NOTIFICATION_SERVICE_PORT:-9087}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${NOTIFICATION_SERVICE_PORT:-8087}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  location-service:
+    build:
+      context: ./services/location-service
+      dockerfile: Dockerfile
+    container_name: skep-location-service
+    environment:
+      SPRING_PROFILES_ACTIVE: ${ENVIRONMENT:-dev}
+      SERVER_PORT: ${LOCATION_SERVICE_PORT:-8088}
+      SERVER_SERVLET_CONTEXT_PATH: /
+
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-skep_db}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-skep_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-change_me}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-20}
+
+      # Redis
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST:-redis}
+      SPRING_DATA_REDIS_PORT: ${REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Logging
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+
+    ports:
+      - "${LOCATION_SERVICE_PORT:-9088}:${LOCATION_SERVICE_PORT:-9088}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${LOCATION_SERVICE_PORT:-8088}/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================
+  # Frontend
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend/skep_app
+      dockerfile: Dockerfile
+    container_name: skep-frontend
+    environment:
+      FLUTTER_BUILD_MODE: ${FLUTTER_BUILD_MODE:-debug}
+      API_BASE_URL: http://localhost:8080
+      DOMAIN: ${DOMAIN:-skep.on1.kr}
+    ports:
+      - "${FRONTEND_PORT:-9000}:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - skep-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  skep-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

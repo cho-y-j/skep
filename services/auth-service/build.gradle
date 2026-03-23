@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.3'
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+
+group = 'com.skep'
+version = '1.0.0'
+sourceCompatibility = '21'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot Web
+    implementation 'org.springframework.boot:spring-boot-starter-web:3.2.3'
+
+    // Spring Security
+    implementation 'org.springframework.boot:spring-boot-starter-security:3.2.3'
+
+    // Spring Data JPA
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa:3.2.3'
+
+    // Spring Data Redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis:3.2.3'
+
+    // PostgreSQL Driver
+    runtimeOnly 'org.postgresql:postgresql:42.7.1'
+
+    // Flyway
+    implementation 'org.flywaydb:flyway-core:9.22.3'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    // Validation
+    implementation 'org.springframework.boot:spring-boot-starter-validation:3.2.3'
+
+    // Actuator
+    implementation 'org.springframework.boot:spring-boot-starter-actuator:3.2.3'
+
+    // Logging
+    implementation 'org.springframework.boot:spring-boot-starter-logging:3.2.3'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test:3.2.3'
+    testImplementation 'org.springframework.security:spring-security-test:6.2.2'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

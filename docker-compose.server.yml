@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: skep-postgres
+    environment:
+      POSTGRES_USER: skep_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SkepDb2026!}
+      POSTGRES_DB: skep_db
+    command: postgres -c max_connections=100
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    container_name: skep-redis
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+
+  api-gateway:
+    image: skep-api-gateway:latest
+    container_name: skep-api-gateway
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-skep-prod-jwt-secret-key-2026-must-be-32-chars}
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      JAVA_OPTS: "-Xmx128m -Xms64m"
+    ports:
+      - "9080:8080"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  auth-service:
+    image: skep-auth-service:latest
+    container_name: skep-auth-service
+    environment:
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/skep_db
+      SPRING_DATASOURCE_USERNAME: skep_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-SkepDb2026!}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-skep-prod-jwt-secret-key-2026-must-be-32-chars}
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      JAVA_OPTS: "-Xmx128m -Xms64m"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  equipment-service:
+    image: skep-equipment-service:latest
+    container_name: skep-equipment-service
+    environment:
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/skep_db
+      SPRING_DATASOURCE_USERNAME: skep_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-SkepDb2026!}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      JAVA_OPTS: "-Xmx128m -Xms64m"
+    depends_on:
+      - postgres
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  document-service:
+    image: skep-document-service:latest
+    container_name: skep-document-service
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/skep_db
+      SPRING_DATASOURCE_USERNAME: skep_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-SkepDb2026!}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      JAVA_OPTS: "-Xmx128m -Xms64m"
+    depends_on:
+      - postgres
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  dispatch-service:
+    image: skep-dispatch-service:latest
+    container_name: skep-dispatch-service
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/skep_db
+      SPRING_DATASOURCE_USERNAME: skep_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-SkepDb2026!}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      JAVA_OPTS: "-Xmx128m -Xms64m"
+    depends_on:
+      - postgres
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  inspection-service:
+    image: skep-inspection-service:latest
+    container_name: skep-inspection-service
+    environment:
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/skep_db
+      SPRING_DATASOURCE_USERNAME: skep_user
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-SkepDb2026!}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "false"
+      JAVA_OPTS: "-Xmx128m -Xms64m"
+    depends_on:
+      - postgres
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  frontend:
+    image: skep-frontend:latest
+    container_name: skep-frontend
+    ports:
+      - "9000:80"
+    networks:
+      - skep-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+networks:
+  skep-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

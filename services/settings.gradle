@@ -1,0 +1,11 @@
+rootProject.name = 'skep-services'
+
+include 'api-gateway'
+include 'auth-service'
+include 'document-service'
+include 'dispatch-service'
+include 'equipment-service'
+include 'inspection-service'
+include 'location-service'
+include 'notification-service'
+include 'settlement-service'

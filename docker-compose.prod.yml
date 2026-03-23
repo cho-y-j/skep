@@ -1,0 +1,301 @@
+version: '3.8'
+
+# Production Override Compose File
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+  postgres:
+    # Use external RDS endpoint
+    image: postgres:16-alpine
+    container_name: skep-postgres-migration
+    environment:
+      PGHOST: ${RDS_ENDPOINT}
+      PGPORT: ${RDS_PORT:-5432}
+      PGDATABASE: ${DB_NAME}
+      PGUSER: ${DB_USERNAME}
+      PGPASSWORD: ${DB_PASSWORD}
+    entrypoint: ["echo", "Using external RDS database"]
+    profiles:
+      - migration-only
+    networks:
+      - skep-network
+
+  redis:
+    # Use external ElastiCache endpoint
+    image: redis:7-alpine
+    container_name: skep-redis-proxy
+    command: echo "Using external ElastiCache"
+    profiles:
+      - proxy-only
+    networks:
+      - skep-network
+
+  api-gateway:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      # External Database (RDS)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      # External Cache (ElastiCache)
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SPRING_DATA_REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-}
+
+      # AWS
+      AWS_REGION: ap-northeast-2
+      AWS_S3_BUCKET: skep-documents-prod
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      # JWT
+      APP_JWT_SECRET: ${JWT_SECRET}
+      APP_JWT_EXPIRATION_HOURS: 24
+
+      # Logging & Monitoring
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+      MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED: true
+
+      # Performance
+      SERVER_TOMCAT_THREADS_MAX: 200
+      SERVER_TOMCAT_THREADS_MIN_SPARE: 20
+      SERVER_COMPRESSION_ENABLED: true
+      SERVER_COMPRESSION_MIN_RESPONSE_SIZE: 1024
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  auth-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      APP_JWT_SECRET: ${JWT_SECRET}
+      APP_JWT_EXPIRATION_HOURS: 24
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  document-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      AWS_REGION: ap-northeast-2
+      AWS_S3_BUCKET: skep-documents-prod
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  equipment-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  dispatch-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  inspection-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  settlement-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  notification-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      FCM_SERVER_KEY: ${FCM_SERVER_KEY}
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8087/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  location-service:
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ENVIRONMENT: prod
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${RDS_ENDPOINT}:${RDS_PORT:-5432}/${DB_NAME}?sslmode=require
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 50
+
+      SPRING_DATA_REDIS_HOST: ${ELASTICACHE_ENDPOINT}
+      SPRING_DATA_REDIS_PORT: ${ELASTICACHE_PORT:-6379}
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      LOGGING_LEVEL_ROOT: WARN
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics,prometheus
+
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    environment:
+      FLUTTER_BUILD_MODE: release
+      API_BASE_URL: https://api.skep.on1.kr
+      DOMAIN: skep.on1.kr
+      NODE_ENV: production
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

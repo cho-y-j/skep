@@ -1,0 +1,121 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: api-gateway
+  profiles:
+    active: docker
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - RewritePath=/api/auth(?<segment>/?.*), $\{segment}
+
+        - id: document-service
+          uri: http://document-service:8082
+          predicates:
+            - Path=/api/documents/**
+          filters:
+            - RewritePath=/api/documents(?<segment>/?.*), $\{segment}
+
+        - id: equipment-service
+          uri: http://equipment-service:8083
+          predicates:
+            - Path=/api/equipment/**
+          filters:
+            - RewritePath=/api/equipment(?<segment>/?.*), $\{segment}
+
+        - id: dispatch-service
+          uri: http://dispatch-service:8084
+          predicates:
+            - Path=/api/dispatch/**
+          filters:
+            - RewritePath=/api/dispatch(?<segment>/?.*), $\{segment}
+
+        - id: inspection-service
+          uri: http://inspection-service:8085
+          predicates:
+            - Path=/api/inspection/**
+          filters:
+            - RewritePath=/api/inspection(?<segment>/?.*), $\{segment}
+
+        - id: settlement-service
+          uri: http://settlement-service:8086
+          predicates:
+            - Path=/api/settlement/**
+          filters:
+            - RewritePath=/api/settlement(?<segment>/?.*), $\{segment}
+
+        - id: notification-service
+          uri: http://notification-service:8087
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - RewritePath=/api/notifications(?<segment>/?.*), $\{segment}
+
+        - id: location-service
+          uri: http://location-service:8088
+          predicates:
+            - Path=/api/location/**
+          filters:
+            - RewritePath=/api/location(?<segment>/?.*), $\{segment}
+
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: false
+            maxAge: 3600
+
+  redis:
+    host: redis
+    port: 6379
+    database: 0
+    timeout: 2000
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://auth-service:8081
+
+jwt:
+  secret: your-super-secret-jwt-key-min-32-characters-long-secret-key-12345
+  expiration: 3600000  # 1 hour in milliseconds
+  refresh-expiration: 604800000  # 7 days in milliseconds
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.skep: DEBUG
+    org.springframework.security: INFO
+    org.springframework.cloud.gateway: DEBUG

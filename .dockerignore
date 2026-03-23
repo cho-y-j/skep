@@ -1,0 +1,64 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+
+# Build
+target
+build
+dist
+node_modules
+
+# Testing
+coverage
+.coverage
+htmlcov
+
+# Dependencies
+.mvn
+gradlew
+gradlew.bat
+gradle
+
+# Documentation
+docs
+*.md
+README.md
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Logs
+logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary
+tmp
+temp
+*.tmp

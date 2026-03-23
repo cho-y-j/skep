@@ -1,0 +1,105 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: api-gateway
+  profiles:
+    active: dev
+  cloud:
+    gateway:
+      routes:
+        - id: auth-service
+          uri: http://auth-service:8081
+          predicates:
+            - Path=/api/auth/**
+
+        - id: document-service
+          uri: http://document-service:8082
+          predicates:
+            - Path=/api/documents/**
+
+        - id: equipment-service
+          uri: http://equipment-service:8083
+          predicates:
+            - Path=/api/equipment/**
+
+        - id: dispatch-service
+          uri: http://dispatch-service:8084
+          predicates:
+            - Path=/api/dispatch/**
+
+        - id: inspection-service
+          uri: http://inspection-service:8085
+          predicates:
+            - Path=/api/inspection/**
+
+        - id: settlement-service
+          uri: http://settlement-service:8086
+          predicates:
+            - Path=/api/settlement/**
+
+        - id: notification-service
+          uri: http://notification-service:8087
+          predicates:
+            - Path=/api/notifications/**
+
+        - id: location-service
+          uri: http://location-service:8088
+          predicates:
+            - Path=/api/location/**
+
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: ${CORS_ALLOWED_ORIGINS:https://skep.on1.kr,http://localhost:3000}
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: false
+            maxAge: 3600
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    database: 0
+    timeout: 2000
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://auth-service:8081
+
+jwt:
+  secret: ${JWT_SECRET:change-me-in-production-min-32-chars-secret-key}
+  expiration: 3600000  # 1 hour in milliseconds
+  refresh-expiration: 604800000  # 7 days in milliseconds
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+    com.skep: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.cloud.gateway: DEBUG

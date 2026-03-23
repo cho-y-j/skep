@@ -1,0 +1,118 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'infrastructure/terraform/**'
+      - '.github/workflows/terraform-plan.yml'
+
+permissions:
+  pull-requests: write
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  TF_VERSION: 1.5.0
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, prod]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GitHub-Actions-TF-Plan
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: terraform fmt -check -recursive ../../
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: |
+          terraform plan -no-color -out=tfplan
+        env:
+          TF_VAR_db_master_password: ${{ secrets.TF_VAR_DB_MASTER_PASSWORD }}
+          TF_VAR_redis_auth_token: ${{ secrets.TF_VAR_REDIS_AUTH_TOKEN }}
+        continue-on-error: true
+
+      - name: Get plan summary
+        id: plan_summary
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: |
+          terraform show -no-color tfplan > tfplan.txt
+          echo "plan_output=$(cat tfplan.txt)" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Comment on PR - Plan Results
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const workspace = '${{ matrix.environment }}';
+            const planOutput = `${{ steps.plan_summary.outputs.plan_output }}`;
+
+            const comment = `## Terraform Plan Results - ${workspace.toUpperCase()}
+
+            ### Format Check
+            ${{ steps.fmt.outcome == 'success' ? '✅' : '⚠️' }} Terraform Format Check
+
+            ### Validation
+            ${{ steps.validate.outcome == 'success' ? '✅' : '❌' }} Terraform Validation
+
+            ### Plan
+            ${{ steps.plan.outcome == 'success' ? '✅' : '❌' }} Terraform Plan
+
+            <details>
+            <summary>Plan Output</summary>
+
+            \`\`\`terraform
+            ${planOutput.substring(0, 10000)}
+            \`\`\`
+
+            </details>`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: |
+          echo "Terraform plan failed"
+          exit 1

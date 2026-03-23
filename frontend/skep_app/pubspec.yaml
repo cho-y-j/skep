@@ -1,0 +1,77 @@
+name: skep_app
+description: SKEP - Equipment Dispatch & Inspection Platform
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_bloc: ^8.1.4
+  equatable: ^2.0.5
+
+  # Networking
+  dio: ^5.4.0
+  retrofit: ^4.1.0
+  json_serializable: ^6.7.0
+
+  # Navigation
+  go_router: ^13.2.0
+
+  # Storage
+  flutter_secure_storage: ^9.0.0
+  hive_flutter: ^1.1.0
+
+  # UI
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.0
+  fl_chart: ^0.67.0
+  data_table_2: ^2.5.12
+  file_picker: ^8.0.0
+  image_picker: ^1.0.7
+
+  # NFC
+  nfc_manager: ^3.3.0
+
+  # Push Notifications
+  firebase_core: ^2.27.0
+  firebase_messaging: ^14.7.20
+  flutter_local_notifications: ^17.0.0
+
+  # Location
+  geolocator: ^11.0.0
+
+  # WebSocket
+  stomp_dart_client: ^0.4.4
+
+  # Utils
+  intl: ^0.19.0
+  json_annotation: ^4.8.1
+  freezed_annotation: ^2.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.6
+  retrofit_generator: ^8.1.0
+  freezed: ^2.4.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+  # fonts:
+  #   - family: Roboto
+  #     fonts:
+  #       - asset: assets/fonts/Roboto-Regular.ttf
+  #       - asset: assets/fonts/Roboto-Bold.ttf
+  #         weight: 700
