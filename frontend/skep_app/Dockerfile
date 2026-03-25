@@ -9,7 +9,7 @@ COPY . .
 RUN flutter pub get
 
 # Build web application
-RUN flutter build web --release
+RUN flutter build web --release --dart-define=API_BASE_URL= --dart-define=WS_BASE_URL=
 
 # Use nginx as the final image
 FROM nginx:alpine

@@ -21,7 +21,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-skep_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-skep_user} -d ${DB_NAME:-skep_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -54,14 +54,14 @@ services:
     container_name: skep-ocr-service
     environment:
       NODE_ENV: ${ENVIRONMENT:-dev}
-      PORT: ${OCR_SERVICE_PORT:-9089}
+      PORT: ${OCR_SERVICE_PORT:-8089}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "${OCR_SERVICE_PORT:-9089}:${OCR_SERVICE_PORT:-9089}"
+      - "${OCR_SERVICE_PORT:-8089}:${OCR_SERVICE_PORT:-8089}"
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${OCR_SERVICE_PORT:-9089}/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${OCR_SERVICE_PORT:-8089}/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -74,14 +74,14 @@ services:
     container_name: skep-govapi-service
     environment:
       NODE_ENV: ${ENVIRONMENT:-dev}
-      PORT: ${GOVAPI_SERVICE_PORT:-9090}
+      PORT: ${GOVAPI_SERVICE_PORT:-8090}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "${GOVAPI_SERVICE_PORT:-9090}:${GOVAPI_SERVICE_PORT:-9090}"
+      - "${GOVAPI_SERVICE_PORT:-8090}:${GOVAPI_SERVICE_PORT:-8090}"
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${GOVAPI_SERVICE_PORT:-9090}/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${GOVAPI_SERVICE_PORT:-8090}/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -123,11 +123,21 @@ services:
       OCR_SERVICE_URL: ${OCR_SERVICE_URL:-http://ocr-service:9089}
       GOVAPI_SERVICE_URL: ${GOVAPI_SERVICE_URL:-http://govapi-service:9090}
 
+      # Service Ports (for gateway routing)
+      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-9081}
+      DOCUMENT_SERVICE_PORT: ${DOCUMENT_SERVICE_PORT:-9082}
+      EQUIPMENT_SERVICE_PORT: ${EQUIPMENT_SERVICE_PORT:-9083}
+      DISPATCH_SERVICE_PORT: ${DISPATCH_SERVICE_PORT:-9084}
+      INSPECTION_SERVICE_PORT: ${INSPECTION_SERVICE_PORT:-9085}
+      SETTLEMENT_SERVICE_PORT: ${SETTLEMENT_SERVICE_PORT:-9086}
+      NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT:-9087}
+      LOCATION_SERVICE_PORT: ${LOCATION_SERVICE_PORT:-9088}
+
       # Logging
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${API_GATEWAY_PORT:-9080}:${API_GATEWAY_PORT:-9080}"
+      - "${API_GATEWAY_PORT:-8080}:${API_GATEWAY_PORT:-8080}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -136,7 +146,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${API_GATEWAY_PORT:-8080}/actuator/health"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${API_GATEWAY_PORT:-8080}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -171,7 +181,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${AUTH_SERVICE_PORT:-9081}:${AUTH_SERVICE_PORT:-9081}"
+      - "${AUTH_SERVICE_PORT:-8081}:${AUTH_SERVICE_PORT:-8081}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -180,7 +190,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${AUTH_SERVICE_PORT:-8081}/actuator/health"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${AUTH_SERVICE_PORT:-8081}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -215,7 +225,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${DOCUMENT_SERVICE_PORT:-9082}:${DOCUMENT_SERVICE_PORT:-9082}"
+      - "${DOCUMENT_SERVICE_PORT:-8082}:${DOCUMENT_SERVICE_PORT:-8082}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -224,7 +234,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${DOCUMENT_SERVICE_PORT:-8082}/actuator/health"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${DOCUMENT_SERVICE_PORT:-8082}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -255,7 +265,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${EQUIPMENT_SERVICE_PORT:-9083}:${EQUIPMENT_SERVICE_PORT:-9083}"
+      - "${EQUIPMENT_SERVICE_PORT:-8083}:${EQUIPMENT_SERVICE_PORT:-8083}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -264,7 +274,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${EQUIPMENT_SERVICE_PORT:-8083}/actuator/health"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${EQUIPMENT_SERVICE_PORT:-8083}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -295,7 +305,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${DISPATCH_SERVICE_PORT:-9084}:${DISPATCH_SERVICE_PORT:-9084}"
+      - "${DISPATCH_SERVICE_PORT:-8084}:${DISPATCH_SERVICE_PORT:-8084}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -304,7 +314,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${DISPATCH_SERVICE_PORT:-8084}/actuator/health"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${DISPATCH_SERVICE_PORT:-8084}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -335,7 +345,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${INSPECTION_SERVICE_PORT:-9085}:${INSPECTION_SERVICE_PORT:-9085}"
+      - "${INSPECTION_SERVICE_PORT:-8085}:${INSPECTION_SERVICE_PORT:-8085}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -344,7 +354,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${INSPECTION_SERVICE_PORT:-8085}/actuator/health"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${INSPECTION_SERVICE_PORT:-8085}/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -375,7 +385,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${SETTLEMENT_SERVICE_PORT:-9086}:${SETTLEMENT_SERVICE_PORT:-9086}"
+      - "${SETTLEMENT_SERVICE_PORT:-8086}:${SETTLEMENT_SERVICE_PORT:-8086}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -384,7 +394,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${SETTLEMENT_SERVICE_PORT:-8086}/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost ${SETTLEMENT_SERVICE_PORT:-8086} || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -418,7 +428,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${NOTIFICATION_SERVICE_PORT:-9087}:${NOTIFICATION_SERVICE_PORT:-9087}"
+      - "${NOTIFICATION_SERVICE_PORT:-8087}:${NOTIFICATION_SERVICE_PORT:-8087}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -427,7 +437,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${NOTIFICATION_SERVICE_PORT:-8087}/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost ${NOTIFICATION_SERVICE_PORT:-8087} || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -458,7 +468,7 @@ services:
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
     ports:
-      - "${LOCATION_SERVICE_PORT:-9088}:${LOCATION_SERVICE_PORT:-9088}"
+      - "${LOCATION_SERVICE_PORT:-8088}:${LOCATION_SERVICE_PORT:-8088}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -467,7 +477,7 @@ services:
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${LOCATION_SERVICE_PORT:-8088}/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost ${LOCATION_SERVICE_PORT:-8088} || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -483,16 +493,16 @@ services:
     container_name: skep-frontend
     environment:
       FLUTTER_BUILD_MODE: ${FLUTTER_BUILD_MODE:-debug}
-      API_BASE_URL: http://localhost:8080
+      API_BASE_URL: http://localhost:9080
       DOMAIN: ${DOMAIN:-skep.on1.kr}
     ports:
-      - "${FRONTEND_PORT:-9000}:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       - api-gateway
     networks:
       - skep-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 -O /dev/null http://0.0.0.0:80 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

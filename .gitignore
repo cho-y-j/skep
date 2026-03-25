@@ -1,0 +1,24 @@
+# Environment & Secrets
+.env
+ACCOUNTS.md
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Build
+build/
+.gradle/
+node_modules/
+
+# Docker
+postgres_data/
+redis_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
