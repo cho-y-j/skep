@@ -11,36 +11,55 @@ class ApiEndpoints {
   static const String logout = '/api/auth/logout';
   static const String me = '/api/auth/me';
 
+  // Company endpoints
+  static const String companies = '/api/auth/companies';
+  static const String company = '/api/auth/companies/{id}';
+  static const String companiesByType = '/api/auth/companies/type/{type}';
+
   // Equipment endpoints
-  static const String equipments = '/api/equipments';
-  static const String equipment = '/api/equipments/{id}';
-  static const String persons = '/api/persons';
-  static const String person = '/api/persons/{id}';
+  static const String equipments = '/api/equipment';
+  static const String equipment = '/api/equipment/{id}';
+  static const String equipmentNfc = '/api/equipment/{id}/nfc';
+  static const String equipmentStatus = '/api/equipment/{id}/status';
+  static const String equipmentAssign = '/api/equipment/{id}/assign';
+  static const String persons = '/api/equipment/persons';
+  static const String person = '/api/equipment/persons/{id}';
 
   // Document endpoints
   static const String documents = '/api/documents';
   static const String document = '/api/documents/{id}';
   static const String documentUpload = '/api/documents/upload';
+  static const String documentFile = '/api/documents/{id}/file';
+  static const String documentTypes = '/api/documents/types';
+  static const String documentsByOwner = '/api/documents/{ownerId}/{ownerType}';
+  static const String documentExpiring = '/api/documents/expiring';
 
   // Dispatch endpoints
-  static const String deploymentPlans = '/api/deployment-plans';
-  static const String deploymentPlan = '/api/deployment-plans/{id}';
-  static const String dailyRosters = '/api/daily-rosters';
-  static const String dailyRoster = '/api/daily-rosters/{id}';
-  static const String workRecords = '/api/work-records';
-  static const String workRecord = '/api/work-records/{id}';
-  static const String startWork = '/api/work-records/{id}/start';
-  static const String endWork = '/api/work-records/{id}/end';
+  static const String deploymentPlans = '/api/dispatch/plans';
+  static const String deploymentPlan = '/api/dispatch/plans/{id}';
+  static const String dailyRosters = '/api/dispatch/rosters';
+  static const String dailyRoster = '/api/dispatch/rosters/{id}';
+  static const String workRecords = '/api/dispatch/work-records';
+  static const String workRecord = '/api/dispatch/work-records/{id}';
+  static const String clockIn = '/api/dispatch/work-records/clock-in';
+  static const String startWork = '/api/dispatch/work-records/{id}/start';
+  static const String endWork = '/api/dispatch/work-records/{id}/end';
+
+  // Confirmation endpoints
+  static const String dailyConfirmations = '/api/dispatch/confirmations/daily';
+  static const String monthlyConfirmations = '/api/dispatch/confirmations/monthly';
 
   // Inspection endpoints
-  static const String safetyInspections = '/api/safety-inspections';
-  static const String safetyInspection = '/api/safety-inspections/{id}';
-  static const String maintenanceInspections = '/api/maintenance-inspections';
-  static const String maintenanceInspection = '/api/maintenance-inspections/{id}';
+  static const String safetyInspections = '/api/inspection/safety';
+  static const String safetyInspection = '/api/inspection/safety/{id}';
+  static const String maintenanceInspections = '/api/inspection/maintenance';
+  static const String maintenanceInspection = '/api/inspection/maintenance/{id}';
+  static const String inspectionItems = '/api/inspection/items';
 
   // Settlement endpoints
-  static const String settlements = '/api/settlements';
-  static const String settlement = '/api/settlements/{id}';
+  static const String settlements = '/api/settlement';
+  static const String settlement = '/api/settlement/{id}';
+  static const String settlementGenerate = '/api/settlement/generate';
 
   // Statistics endpoints
   static const String statistics = '/api/statistics';
@@ -48,7 +67,13 @@ class ApiEndpoints {
   // Notification endpoints
   static const String notifications = '/api/notifications';
   static const String notification = '/api/notifications/{id}';
-  static const String messages = '/api/messages';
+  static const String messages = '/api/notifications/messages';
+  static const String fcmRegister = '/api/notifications/fcm/register';
+
+  // Location endpoints
+  static const String locationUpdate = '/api/location/update';
+  static const String locationCurrent = '/api/location/current/{siteId}';
+  static const String locationWorker = '/api/location/worker/{workerId}';
 
   // WebSocket endpoint
   static const String wsBase = String.fromEnvironment(
