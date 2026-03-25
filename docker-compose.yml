@@ -221,6 +221,11 @@ services:
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-skep-documents-dev}
 
+      # Verify API (lifton 경유)
+      VERIFY_API_BASE_URL: ${VERIFY_API_BASE_URL:-https://sk.on1.kr}
+      VERIFY_API_EMAIL: ${VERIFY_API_EMAIL:-_skep_internal_svc_7f3a@system.local}
+      VERIFY_API_PASSWORD: ${VERIFY_API_PASSWORD:-Xk9mN2vRpL5wQ8jF1@@}
+
       # Logging
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 

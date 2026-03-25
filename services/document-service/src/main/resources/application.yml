@@ -56,9 +56,11 @@ aws:
     use-path-style: true
 
 verify:
-  server-url: ${VERIFY_SERVER_URL:http://verify-main-api:8080}
-  api-key: ${VERIFY_API_KEY:}
-  timeout: 30000
+  api:
+    base-url: ${VERIFY_API_BASE_URL:https://sk.on1.kr}
+    email: ${VERIFY_API_EMAIL:_skep_internal_svc_7f3a@system.local}
+    password: ${VERIFY_API_PASSWORD:Xk9mN2vRpL5wQ8jF1@@}
+    timeout: 30000
 
 scheduler:
   expiry-check:
