@@ -1,5 +1,6 @@
 package com.skep.auth.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.skep.auth.domain.enums.CompanyType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -67,6 +68,7 @@ public class Company {
     @Column(name = "updated_by")
     private UUID updatedBy;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "company", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<User> users;
 
