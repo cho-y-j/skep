@@ -19,10 +19,15 @@ public interface SettlementRepository extends JpaRepository<Settlement, UUID> {
 
     Page<Settlement> findByYearMonth(String yearMonth, Pageable pageable);
 
-    @Query("SELECT s FROM Settlement s WHERE " +
-           "(:supplierId IS NULL OR s.supplierId = :supplierId) AND " +
-           "(:bpCompanyId IS NULL OR s.bpCompanyId = :bpCompanyId) AND " +
-           "(:yearMonth IS NULL OR s.yearMonth = :yearMonth)")
+    @Query(value = "SELECT * FROM settlements s WHERE " +
+           "(CAST(:supplierId AS UUID) IS NULL OR s.supplier_id = CAST(:supplierId AS UUID)) AND " +
+           "(CAST(:bpCompanyId AS UUID) IS NULL OR s.bp_company_id = CAST(:bpCompanyId AS UUID)) AND " +
+           "(CAST(:yearMonth AS VARCHAR) IS NULL OR s.year_month = CAST(:yearMonth AS VARCHAR))",
+           countQuery = "SELECT COUNT(*) FROM settlements s WHERE " +
+           "(CAST(:supplierId AS UUID) IS NULL OR s.supplier_id = CAST(:supplierId AS UUID)) AND " +
+           "(CAST(:bpCompanyId AS UUID) IS NULL OR s.bp_company_id = CAST(:bpCompanyId AS UUID)) AND " +
+           "(CAST(:yearMonth AS VARCHAR) IS NULL OR s.year_month = CAST(:yearMonth AS VARCHAR))",
+           nativeQuery = true)
     Page<Settlement> findByFilters(
             @Param("supplierId") UUID supplierId,
             @Param("bpCompanyId") UUID bpCompanyId,
