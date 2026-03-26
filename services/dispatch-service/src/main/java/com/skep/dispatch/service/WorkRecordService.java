@@ -5,9 +5,6 @@ import com.skep.dispatch.dto.ClockInRequest;
 import com.skep.dispatch.dto.WorkRecordRequest;
 import com.skep.dispatch.repository.WorkRecordRepository;
 import lombok.RequiredArgsConstructor;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,14 +19,10 @@ import java.util.UUID;
 public class WorkRecordService {
 
     private final WorkRecordRepository workRecordRepository;
-    private static final GeometryFactory geometryFactory = new GeometryFactory();
-
     public WorkRecord clockIn(ClockInRequest request) {
-        Point location = null;
+        String location = null;
         if (request.getGpsLat() != null && request.getGpsLng() != null) {
-            location = geometryFactory.createPoint(
-                new Coordinate(request.getGpsLng(), request.getGpsLat())
-            );
+            location = request.getGpsLat() + "," + request.getGpsLng();
         }
 
         WorkRecord record = WorkRecord.builder()

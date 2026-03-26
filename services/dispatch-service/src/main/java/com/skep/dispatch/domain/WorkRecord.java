@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.locationtech.jts.geom.Point;
+// Point type replaced with String for web compatibility
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -39,8 +39,8 @@ public class WorkRecord implements Serializable {
 
     private LocalDateTime clockInAt;
 
-    @Column(columnDefinition = "POINT")
-    private Point clockInLocation;
+    @Column(length = 100)
+    private String clockInLocation; // "lat,lng" format
 
     @Builder.Default
     private Boolean clockInVerified = false;
