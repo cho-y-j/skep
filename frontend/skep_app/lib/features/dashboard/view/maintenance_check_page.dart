@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -235,20 +236,12 @@ class _MaintenanceCheckPageState extends State<MaintenanceCheckPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // NFC 스캔 영역
-        GestureDetector(
-          onTap: () {
-            setState(() => _nfcScanned = true);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('NFC 스캔 완료: 25톤 크레인 (서울 가 1234)'),
-                backgroundColor: Color(0xFF16A34A),
-              ),
-            );
-          },
-          child: Container(
+        // NFC/장비 확인 영역
+        if (kIsWeb) ...[
+          // Web: show a simple button instead of NFC
+          Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: _nfcScanned
                   ? const Color(0xFF16A34A).withOpacity(0.05)
@@ -258,53 +251,104 @@ class _MaintenanceCheckPageState extends State<MaintenanceCheckPage> {
                 color: _nfcScanned
                     ? const Color(0xFF16A34A).withOpacity(0.3)
                     : const Color(0xFF2196F3).withOpacity(0.3),
-                width: 2,
-                strokeAlign: BorderSide.strokeAlignInside,
               ),
             ),
-            child: Column(
+            child: Row(
               children: [
                 Icon(
-                  _nfcScanned ? Icons.check_circle : Icons.nfc,
-                  size: 48,
+                  _nfcScanned ? Icons.check_circle : Icons.construction,
+                  size: 32,
                   color: _nfcScanned ? const Color(0xFF16A34A) : const Color(0xFF2196F3),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  _nfcScanned ? 'NFC 스캔 완료' : '여기를 탭하여 NFC 스캔 시작',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: _nfcScanned ? const Color(0xFF16A34A) : const Color(0xFF2196F3),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _nfcScanned ? '장비 확인 완료' : '장비를 확인해주세요',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: _nfcScanned ? const Color(0xFF16A34A) : const Color(0xFF1E293B),
+                        ),
+                      ),
+                      if (_nfcScanned)
+                        const Text('정비점검표를 작성해주세요.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                      if (!_nfcScanned)
+                        const Text('웹 환경에서는 NFC 대신 버튼으로 장비를 확인합니다.', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                    ],
                   ),
                 ),
-                if (_nfcScanned)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: Text(
-                      '25톤 크레인 (서울 가 1234)',
-                      style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
-                    ),
-                  ),
                 if (!_nfcScanned)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: Text(
-                      '장비 NFC 태그에 휴대폰을 가까이 대세요',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() => _nfcScanned = true);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('장비 확인 완료'), backgroundColor: Color(0xFF16A34A)),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2196F3),
+                      foregroundColor: Colors.white,
                     ),
+                    child: const Text('장비 확인'),
                   ),
               ],
             ),
           ),
-        ),
+        ] else ...[
+          // Mobile: NFC tap area
+          GestureDetector(
+            onTap: () {
+              setState(() => _nfcScanned = true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('NFC 스캔 완료'), backgroundColor: Color(0xFF16A34A)),
+              );
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: _nfcScanned
+                    ? const Color(0xFF16A34A).withOpacity(0.05)
+                    : const Color(0xFF2196F3).withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _nfcScanned
+                      ? const Color(0xFF16A34A).withOpacity(0.3)
+                      : const Color(0xFF2196F3).withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    _nfcScanned ? Icons.check_circle : Icons.nfc,
+                    size: 48,
+                    color: _nfcScanned ? const Color(0xFF16A34A) : const Color(0xFF2196F3),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _nfcScanned ? 'NFC 스캔 완료' : 'NFC 태그에 휴대폰을 가까이 대세요',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _nfcScanned ? const Color(0xFF16A34A) : const Color(0xFF2196F3),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
-        // 점검 폼
+        // 점검 폼 (always enabled on web, NFC-gated on mobile)
         AnimatedOpacity(
-          opacity: _nfcScanned ? 1.0 : 0.4,
+          opacity: (kIsWeb || _nfcScanned) ? 1.0 : 0.4,
           duration: const Duration(milliseconds: 300),
           child: IgnorePointer(
-            ignoring: !_nfcScanned,
+            ignoring: !kIsWeb && !_nfcScanned,
             child: Form(
               key: _formKey,
               child: Container(

@@ -85,6 +85,10 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
   bool _isLoading = true;
   String? _error;
 
+  // Sites
+  List<Map<String, dynamic>> _sites = [];
+  String? _selectedSiteId;
+
   List<_EquipmentLocation> get _filteredEquipments {
     return _equipments.where((eq) {
       final matchesSearch = _searchQuery.isEmpty ||
@@ -101,13 +105,41 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
   void initState() {
     super.initState();
     _mapController = MapController();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSites());
   }
 
   @override
   void dispose() {
     _mapController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSites() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.sites);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _sites = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _sites = (data['content'] as List).cast<Map<String, dynamic>>();
+        }
+        // Auto-select first site
+        if (_sites.isNotEmpty && _selectedSiteId == null) {
+          _selectedSiteId = _sites.first['id']?.toString();
+        }
+      }
+    } catch (e) {
+      // If sites fail to load, still allow manual input
+      _sites = [];
+    }
+    // Load location data with selected site
+    await _loadData();
   }
 
   Future<void> _loadData() async {
@@ -117,9 +149,9 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
     });
     try {
       final dioClient = context.read<DioClient>();
-      // Use siteId=1 as default; adjust as needed
+      final siteId = _selectedSiteId ?? '1';
       final response = await dioClient.get<dynamic>(
-        ApiEndpoints.locationCurrent.replaceAll('{siteId}', '1'),
+        ApiEndpoints.locationCurrent.replaceAll('{siteId}', siteId),
       );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
@@ -217,7 +249,7 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
         child: const Center(child: CircularProgressIndicator()),
       );
     }
-    if (_error != null && _equipments.isEmpty) {
+    if (_error != null && _equipments.isEmpty && _sites.isEmpty) {
       return Container(
         color: const Color(0xFFF8FAFC),
         padding: const EdgeInsets.all(48),
@@ -231,7 +263,7 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
               const SizedBox(height: 8),
               Text(_error!, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+              TextButton(onPressed: _loadSites, child: const Text('다시 시도')),
             ],
           ),
         ),
@@ -283,6 +315,34 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
             ),
             child: Column(
               children: [
+                // Site selector
+                if (_sites.isNotEmpty) ...[
+                  DropdownButtonFormField<String>(
+                    value: _selectedSiteId,
+                    decoration: InputDecoration(
+                      labelText: '현장 선택',
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      isDense: true,
+                    ),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+                    items: _sites.map((s) {
+                      final id = s['id']?.toString() ?? '';
+                      final name = s['name']?.toString() ?? s['siteName']?.toString() ?? '현장 #$id';
+                      return DropdownMenuItem<String>(value: id, child: Text(name, overflow: TextOverflow.ellipsis));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedSiteId = val);
+                        _loadData();
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 TextField(
                   decoration: InputDecoration(
                     hintText: '차량번호, 운전원, 장비유형 검색',

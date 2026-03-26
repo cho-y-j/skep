@@ -64,13 +64,18 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
     try {
       final dioClient = context.read<DioClient>();
 
-      final results = await Future.wait([
-        dioClient.get<dynamic>(ApiEndpoints.equipments).catchError((_) => null),
-        dioClient.get<dynamic>(ApiEndpoints.safetyInspections).catchError((_) => null),
-      ]);
+      // Load equipment list and inspection history separately to handle errors gracefully
+      dynamic eqResponse;
+      dynamic inspResponse;
+      try {
+        eqResponse = await dioClient.get<dynamic>(ApiEndpoints.equipments);
+      } catch (_) {}
+      try {
+        inspResponse = await dioClient.get<dynamic>(ApiEndpoints.safetyInspections);
+      } catch (_) {}
 
       // Equipment list for dropdown
-      final eqData = results[0]?.data;
+      final eqData = eqResponse?.data;
       if (eqData is List) {
         _equipmentList = eqData.cast<Map<String, dynamic>>();
       } else if (eqData is Map && eqData['content'] is List) {
@@ -82,7 +87,7 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
       }
 
       // Inspection history
-      final inspData = results[1]?.data;
+      final inspData = inspResponse?.data;
       if (inspData is List) {
         _historyList = inspData.cast<Map<String, dynamic>>();
       } else if (inspData is Map && inspData['content'] is List) {
@@ -261,7 +266,7 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
       color: const Color(0xFFF8FAFC),
       child: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null && _equipmentList.isEmpty
+          : _error != null && _equipmentList.isEmpty && _historyList.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,

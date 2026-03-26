@@ -25,17 +25,20 @@ public class WorkRecordService {
     private static final GeometryFactory geometryFactory = new GeometryFactory();
 
     public WorkRecord clockIn(ClockInRequest request) {
-        Point location = geometryFactory.createPoint(
-            new Coordinate(request.getGpsLng(), request.getGpsLat())
-        );
+        Point location = null;
+        if (request.getGpsLat() != null && request.getGpsLng() != null) {
+            location = geometryFactory.createPoint(
+                new Coordinate(request.getGpsLng(), request.getGpsLat())
+            );
+        }
 
         WorkRecord record = WorkRecord.builder()
             .dailyRosterId(request.getDailyRosterId())
             .workerId(request.getWorkerId())
-            .workerType(request.getWorkerType())
+            .workerType(request.getWorkerType() != null ? request.getWorkerType() : "DRIVER")
             .clockInAt(LocalDateTime.now())
             .clockInLocation(location)
-            .clockInVerified(true)
+            .clockInVerified(location != null)
             .build();
 
         return workRecordRepository.save(record);

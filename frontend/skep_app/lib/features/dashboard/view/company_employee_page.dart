@@ -182,15 +182,14 @@ class _CompanyEmployeePageState extends State<CompanyEmployeePage> {
                           try {
                             final dioClient = context.read<DioClient>();
                             await dioClient.post(
-                              ApiEndpoints.register,
+                              '/api/auth/companies/employees',
                               data: {
                                 'name': nameController.text,
                                 'email': emailController.text,
                                 'password': passwordController.text,
                                 'phone': phoneController.text,
                                 'position': positionController.text,
-                                // company association is handled server-side
-                                // via the authenticated admin's token
+                                'role': 'EMPLOYEE',
                               },
                             );
 

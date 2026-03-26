@@ -452,95 +452,110 @@ class _EquipmentTypeSettingsPageState extends State<EquipmentTypeSettingsPage> {
               ),
             )
           else
-            // 카드 리스트
-            ...List.generate(_equipmentTypes.length, (i) {
-              final et = _equipmentTypes[i];
-              final docs = ((et['documents'] as List?)?.cast<String>()) ?? <String>[];
-              final code = et['code']?.toString() ?? '';
-              final typeName = et['type']?.toString() ?? et['name']?.toString() ?? '-';
-              return Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 헤더
-                    Row(
-                      children: [
-                        if (code.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(code,
-                                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
-                          ),
-                        if (code.isNotEmpty) const SizedBox(width: 12),
-                        Text(typeName,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                        const Spacer(),
-                        Text('서류 ${docs.length}개',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
-                          tooltip: '수정',
-                          onPressed: () => _showAddEditDialog(existing: et),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                          tooltip: '삭제',
-                          onPressed: () => _showDeleteDialog(et),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    // 서류 목록 (순서대로)
-                    ...List.generate(docs.length, (j) {
-                      final docName = docs[j];
-                      final docType = _findDocType(docName);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: [
+            // 카드 리스트 (드래그하여 순서 변경 가능)
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _equipmentTypes.length,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  if (newIndex > oldIndex) newIndex--;
+                  final item = _equipmentTypes.removeAt(oldIndex);
+                  _equipmentTypes.insert(newIndex, item);
+                });
+              },
+              itemBuilder: (context, i) {
+                final et = _equipmentTypes[i];
+                final docs = ((et['documents'] as List?)?.cast<String>()) ?? <String>[];
+                final code = et['code']?.toString() ?? '';
+                final typeName = et['type']?.toString() ?? et['name']?.toString() ?? '-';
+                return Container(
+                  key: ValueKey(et['id']?.toString() ?? '$i-$code'),
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 헤더
+                      Row(
+                        children: [
+                          const Icon(Icons.drag_handle, size: 20, color: Color(0xFF94A3B8)),
+                          const SizedBox(width: 8),
+                          if (code.isNotEmpty)
                             Container(
-                              width: 22, height: 22,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(4),
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Center(child: Text('${j + 1}',
-                                  style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w600))),
+                              child: Text(code,
+                                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
                             ),
-                            const SizedBox(width: 10),
-                            Text(docName, style: const TextStyle(fontSize: 13)),
-                            const SizedBox(width: 8),
-                            if (docType != null && docType.hasExpiryManagement)
-                              _miniTag('${docType.expiryFieldName.isNotEmpty ? docType.expiryFieldName : "만료일"}', const Color(0xFFFF9800)),
-                            if (docType != null && docType.hasExpiryManagement) const SizedBox(width: 4),
-                            if (docType != null && docType.hasVerification)
-                              _miniTag('${docType.verificationProvider}', const Color(0xFF4CAF50)),
-                            if (docType != null && docType.hasVerification) const SizedBox(width: 4),
-                            if (docType != null && docType.hasOcr)
-                              _miniTag('OCR', const Color(0xFF2196F3)),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              );
-            }),
+                          if (code.isNotEmpty) const SizedBox(width: 12),
+                          Text(typeName,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                          const Spacer(),
+                          Text('서류 ${docs.length}개',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                            tooltip: '수정',
+                            onPressed: () => _showAddEditDialog(existing: et),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                            tooltip: '삭제',
+                            onPressed: () => _showDeleteDialog(et),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 12),
+                      // 서류 목록 (순서대로)
+                      ...List.generate(docs.length, (j) {
+                        final docName = docs[j];
+                        final docType = _findDocType(docName);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 22, height: 22,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Center(child: Text('${j + 1}',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w600))),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(docName, style: const TextStyle(fontSize: 13)),
+                              const SizedBox(width: 8),
+                              if (docType != null && docType.hasExpiryManagement)
+                                _miniTag('${docType.expiryFieldName.isNotEmpty ? docType.expiryFieldName : "만료일"}', const Color(0xFFFF9800)),
+                              if (docType != null && docType.hasExpiryManagement) const SizedBox(width: 4),
+                              if (docType != null && docType.hasVerification)
+                                _miniTag('${docType.verificationProvider}', const Color(0xFF4CAF50)),
+                              if (docType != null && docType.hasVerification) const SizedBox(width: 4),
+                              if (docType != null && docType.hasOcr)
+                                _miniTag('OCR', const Color(0xFF2196F3)),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );

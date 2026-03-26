@@ -120,7 +120,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     SidebarMenuItem(
       id: 'inspection',
       icon: Icons.verified_user_outlined,
-      label: '안전점검',
+      label: '점검 관리',
     ),
     SidebarMenuItem(
       id: 'settlement',
@@ -282,7 +282,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       case 'documents':
         return '서류 관리';
       case 'inspection':
-        return '안전점검';
+        return '점검 관리';
       case 'settlement':
         return '정산';
       case 'statistics':

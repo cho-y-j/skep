@@ -459,22 +459,28 @@ class _SupplierEquipmentRegisterPageState
   }
 
   Future<void> _pickExpiryDate(String docName) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate:
-          _expiryDates[docName] ?? DateTime.now().add(const Duration(days: 365)),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      locale: const Locale('ko', 'KR'),
-    );
-    if (picked != null) {
-      setState(() {
-        _expiryDates[docName] = picked;
-        _uploadedDocs[docName]?.expiryDate = picked;
-        _expiryControllers[docName]?.text =
-            '${picked.year}년 ${picked.month}월 ${picked.day}일';
-      });
+    DateTime? picked;
+    try {
+      picked = await showDatePicker(
+        context: context,
+        initialDate:
+            _expiryDates[docName] ?? DateTime.now().add(const Duration(days: 365)),
+        firstDate: DateTime(2020),
+        lastDate: DateTime(2100),
+        locale: const Locale('ko', 'KR'),
+      );
+    } catch (e) {
+      // Date picker cancelled or error - do nothing
+      return;
     }
+    if (!mounted) return;
+    if (picked == null) return; // User cancelled the picker
+    setState(() {
+      _expiryDates[docName] = picked;
+      _uploadedDocs[docName]?.expiryDate = picked;
+      _expiryControllers[docName]?.text =
+          '${picked!.year}년 ${picked.month}월 ${picked.day}일';
+    });
   }
 
   // ==================== 등록 ====================
@@ -1088,20 +1094,24 @@ class _SupplierEquipmentRegisterPageState
     final label = docType.expiryFieldName.isNotEmpty
         ? '만료일 (${docType.expiryFieldName})'
         : '만료일';
-    return TextField(
-      controller: _expiryControllers[docName],
-      readOnly: true,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: '날짜를 선택하세요',
-        border: const OutlineInputBorder(),
-        prefixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
-        suffixIcon: IconButton(
-          icon: const Icon(Icons.date_range, size: 18),
-          onPressed: () => _pickExpiryDate(docName),
+    return GestureDetector(
+      onTap: () => _pickExpiryDate(docName),
+      child: AbsorbPointer(
+        child: TextField(
+          controller: _expiryControllers[docName],
+          readOnly: true,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: '날짜를 선택하세요',
+            border: const OutlineInputBorder(),
+            prefixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.date_range, size: 18),
+              onPressed: () => _pickExpiryDate(docName),
+            ),
+          ),
         ),
       ),
-      onTap: () => _pickExpiryDate(docName),
     );
   }
 

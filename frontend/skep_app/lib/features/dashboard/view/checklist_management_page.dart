@@ -16,7 +16,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
   bool _isLoadingPlans = true;
   String? _errorPlans;
 
-  int? _selectedPlanId;
+  String? _selectedPlanId;
   Map<String, dynamic>? _checklist;
   bool _isLoadingChecklist = false;
   String? _errorChecklist;
@@ -34,9 +34,9 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
   List<Map<String, dynamic>> _equipmentList = [];
   List<Map<String, dynamic>> _personsList = [];
   bool _isLoadingAssignment = false;
-  int? _selectedEquipmentId;
-  int? _selectedDriverId;
-  List<int> _selectedGuideIds = [];
+  String? _selectedEquipmentId;
+  String? _selectedDriverId;
+  List<String> _selectedGuideIds = [];
   Map<String, dynamic>? _currentAssignment;
   bool _isLoadingCurrentAssignment = false;
 
@@ -71,7 +71,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     if (mounted) setState(() => _isLoadingPlans = false);
   }
 
-  Future<void> _loadChecklist(int planId) async {
+  Future<void> _loadChecklist(String planId) async {
     setState(() {
       _isLoadingChecklist = true;
       _errorChecklist = null;
@@ -79,7 +79,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     });
     try {
       final dioClient = context.read<DioClient>();
-      final response = await dioClient.get<dynamic>(ApiEndpoints.checklists.replaceFirst('{planId}', planId.toString()));
+      final response = await dioClient.get<dynamic>(ApiEndpoints.checklists.replaceFirst('{planId}', planId));
       if (response.statusCode == 200 && response.data != null) {
         _checklist = response.data is Map<String, dynamic> ? response.data : null;
         if (_checklist != null) {
@@ -105,7 +105,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     if (_selectedPlanId == null) return;
     try {
       final dioClient = context.read<DioClient>();
-      final response = await dioClient.get<dynamic>(ApiEndpoints.checklists.replaceFirst('{planId}', _selectedPlanId.toString()));
+      final response = await dioClient.get<dynamic>(ApiEndpoints.checklists.replaceFirst('{planId}', _selectedPlanId!));
       if (response.statusCode == 200 && response.data != null) {
         _checklist = response.data is Map<String, dynamic> ? response.data : null;
         if (_checklist != null) {
@@ -153,14 +153,14 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     if (mounted) setState(() => _isLoadingAssignment = false);
   }
 
-  Future<void> _loadCurrentAssignment(int equipmentId) async {
+  Future<void> _loadCurrentAssignment(String equipmentId) async {
     setState(() {
       _isLoadingCurrentAssignment = true;
       _currentAssignment = null;
     });
     try {
       final dioClient = context.read<DioClient>();
-      final url = ApiEndpoints.equipmentAssign.replaceFirst('{id}', equipmentId.toString()).replaceFirst('/assign', '/current-assignment');
+      final url = ApiEndpoints.equipmentAssign.replaceFirst('{id}', equipmentId).replaceFirst('/assign', '/current-assignment');
       final response = await dioClient.get<dynamic>(url);
       if (response.statusCode == 200 && response.data != null) {
         _currentAssignment = response.data is Map<String, dynamic> ? response.data : null;
@@ -181,7 +181,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     }
     try {
       final dioClient = context.read<DioClient>();
-      final url = ApiEndpoints.equipmentAssign.replaceFirst('{id}', _selectedEquipmentId.toString());
+      final url = ApiEndpoints.equipmentAssign.replaceFirst('{id}', _selectedEquipmentId!);
       await dioClient.post<dynamic>(url, data: {
         'driverId': _selectedDriverId,
         'guideIds': _selectedGuideIds,
@@ -412,7 +412,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
                   children: [
                     const Text('투입 체크리스트', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
                     const SizedBox(height: 4),
-                    Text('배차 계획별 투입 체크리스트를 관리합니다.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                    Text('투입 계획별 체크리스트를 관리합니다.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                   ],
                 ),
               ),
@@ -475,23 +475,23 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
           children: [
             Icon(Icons.assignment_outlined, size: 40, color: Color(0xFFCBD5E1)),
             SizedBox(height: 8),
-            Text('등록된 배차 계획이 없습니다', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
+            Text('등록된 투입 계획이 없습니다', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
           ],
         ),
       );
     }
 
-    return DropdownButtonFormField<int>(
+    return DropdownButtonFormField<String>(
       value: _selectedPlanId,
       decoration: const InputDecoration(
-        labelText: '배차 계획 선택',
+        labelText: '투입 계획 선택',
         border: OutlineInputBorder(),
       ),
       items: _plans.map((p) {
-        final id = p['id'];
+        final id = p['id']?.toString() ?? '';
         final name = p['title']?.toString() ?? p['planName']?.toString() ?? p['siteName']?.toString() ?? '계획 #$id';
-        return DropdownMenuItem<int>(
-          value: id is int ? id : int.tryParse(id.toString()),
+        return DropdownMenuItem<String>(
+          value: id,
           child: Text(name),
         );
       }).toList(),
@@ -686,7 +686,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
             const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
           else ...[
             // Equipment dropdown
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<String>(
               value: _selectedEquipmentId,
               decoration: const InputDecoration(
                 labelText: '장비 선택',
@@ -694,8 +694,8 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
                 prefixIcon: Icon(Icons.construction, size: 20),
               ),
               items: _equipmentList.map((e) {
-                final id = e['id'] is int ? e['id'] as int : int.tryParse(e['id'].toString());
-                return DropdownMenuItem<int>(
+                final id = e['id']?.toString() ?? '';
+                return DropdownMenuItem<String>(
                   value: id,
                   child: Text(_equipmentName(e)),
                 );
@@ -708,7 +708,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
             const SizedBox(height: 16),
 
             // Driver dropdown
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<String>(
               value: _selectedDriverId,
               decoration: const InputDecoration(
                 labelText: '기사 선택 (DRIVER)',
@@ -716,8 +716,8 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
                 prefixIcon: Icon(Icons.person, size: 20),
               ),
               items: _drivers.map((p) {
-                final id = p['id'] is int ? p['id'] as int : int.tryParse(p['id'].toString());
-                return DropdownMenuItem<int>(
+                final id = p['id']?.toString() ?? '';
+                return DropdownMenuItem<String>(
                   value: id,
                   child: Text(_personName(p)),
                 );
@@ -747,7 +747,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
                       spacing: 8,
                       runSpacing: 4,
                       children: _guides.map((p) {
-                        final id = p['id'] is int ? p['id'] as int : int.tryParse(p['id'].toString()) ?? 0;
+                        final id = p['id']?.toString() ?? '';
                         final selected = _selectedGuideIds.contains(id);
                         return FilterChip(
                           label: Text(_personName(p)),

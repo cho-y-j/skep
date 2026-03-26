@@ -16,6 +16,8 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
   List<Map<String, dynamic>> _deployments = [];
   List<Map<String, dynamic>> _equipmentOptions = [];
   List<Map<String, dynamic>> _personnelOptions = [];
+  List<Map<String, dynamic>> _bpCompanies = [];
+  List<Map<String, dynamic>> _sites = [];
   bool _isLoading = true;
   String? _error;
 
@@ -36,6 +38,8 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
         dioClient.get<dynamic>(ApiEndpoints.deploymentPlans),
         dioClient.get<dynamic>(ApiEndpoints.equipments),
         dioClient.get<dynamic>(ApiEndpoints.persons),
+        dioClient.get<dynamic>(ApiEndpoints.companiesByType.replaceAll('{type}', 'BP_COMPANY')),
+        dioClient.get<dynamic>(ApiEndpoints.sites),
       ]);
 
       // Parse deployment plans
@@ -66,6 +70,26 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
         _personnelOptions = (persData['content'] as List).cast<Map<String, dynamic>>();
       } else {
         _personnelOptions = [];
+      }
+
+      // Parse BP companies
+      final bpData = responses[3].data;
+      if (bpData is List) {
+        _bpCompanies = bpData.cast<Map<String, dynamic>>();
+      } else if (bpData is Map && bpData['content'] is List) {
+        _bpCompanies = (bpData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _bpCompanies = [];
+      }
+
+      // Parse sites
+      final siteData = responses[4].data;
+      if (siteData is List) {
+        _sites = siteData.cast<Map<String, dynamic>>();
+      } else if (siteData is Map && siteData['content'] is List) {
+        _sites = (siteData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _sites = [];
       }
     } catch (e) {
       _error = e.toString();
@@ -131,8 +155,8 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
   }
 
   void _showDeploymentRequestDialog() {
-    String site = '';
-    String bp = '';
+    String? selectedSite;
+    String? selectedBp;
     String? selectedEquipment;
     String? selectedOperator;
     DateTime startDate = DateTime.now();
@@ -155,20 +179,32 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextFormField(
+                  DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: '현장명',
                       border: OutlineInputBorder(),
                     ),
-                    onChanged: (v) => site = v,
+                    items: _sites
+                        .map((s) => DropdownMenuItem(
+                            value: (s['id'] ?? s['name'] ?? '').toString(),
+                            child: Text(s['name'] ?? s['siteName'] ?? s['id'].toString())))
+                        .toList(),
+                    onChanged: (v) =>
+                        setDialogState(() => selectedSite = v),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  DropdownButtonFormField<String>(
                     decoration: const InputDecoration(
                       labelText: 'BP사',
                       border: OutlineInputBorder(),
                     ),
-                    onChanged: (v) => bp = v,
+                    items: _bpCompanies
+                        .map((c) => DropdownMenuItem(
+                            value: (c['id'] ?? c['name'] ?? '').toString(),
+                            child: Text(c['name'] ?? c['companyName'] ?? c['id'].toString())))
+                        .toList(),
+                    onChanged: (v) =>
+                        setDialogState(() => selectedBp = v),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -277,8 +313,8 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
                   await dioClient.post<dynamic>(
                     ApiEndpoints.deploymentPlans,
                     data: {
-                      'siteName': site,
-                      'bpCompanyName': bp,
+                      'siteId': selectedSite,
+                      'bpCompanyId': selectedBp,
                       'equipmentId': selectedEquipment,
                       'operatorId': selectedOperator,
                       'startDate': '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}',

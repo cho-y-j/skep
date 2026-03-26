@@ -35,6 +35,7 @@ dependencies:
   data_table_2: ^2.5.12
   file_picker: ^8.0.0
   image_picker: ^1.0.7
+  url_launcher: ^6.2.0
 
   # NFC
   nfc_manager: ^3.3.0

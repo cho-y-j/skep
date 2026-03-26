@@ -1,12 +1,14 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/api_endpoints.dart';
 import 'package:skep_app/core/network/dio_client.dart';
 import 'package:dio/dio.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-// Conditional imports for web platform
+// Conditional imports for web platform - only loaded on web
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 // ignore: avoid_web_libraries_in_flutter
@@ -30,24 +32,22 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
   final TextEditingController _ownerIdController = TextEditingController();
   String _ownerType = 'EQUIPMENT';
 
+  // Owner selection lists
+  List<Map<String, dynamic>> _equipmentOwners = [];
+  List<Map<String, dynamic>> _personOwners = [];
+
   // PDF viewer registration tracking
   final Set<String> _registeredPdfViewers = {};
 
   // Web platform detection
-  bool _isWebPlatform = true;
+  bool _isWebPlatform = kIsWeb;
 
   @override
   void initState() {
     super.initState();
-    // Detect web platform
-    try {
-      html.window; // Will work on web
-      _isWebPlatform = true;
-    } catch (_) {
-      _isWebPlatform = false;
-    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDocumentTypes();
+      _loadOwnerLists();
       _loadDocuments();
     });
   }
@@ -56,6 +56,85 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
   void dispose() {
     _ownerIdController.dispose();
     super.dispose();
+  }
+
+  Widget _buildOwnerDropdown() {
+    final List<Map<String, dynamic>> owners =
+        _ownerType == 'EQUIPMENT' ? _equipmentOwners : _personOwners;
+
+    if (owners.isEmpty) {
+      return TextField(
+        controller: _ownerIdController,
+        decoration: InputDecoration(
+          hintText: '소유자 ID를 입력하세요...',
+          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+          prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          filled: true,
+          fillColor: const Color(0xFFF8FAFC),
+        ),
+      );
+    }
+
+    final currentValue = _ownerIdController.text.trim();
+    final hasMatch = owners.any((o) => o['id']?.toString() == currentValue);
+
+    return DropdownButtonFormField<String>(
+      value: hasMatch ? currentValue : null,
+      decoration: InputDecoration(
+        labelText: _ownerType == 'EQUIPMENT' ? '장비 선택' : '인력 선택',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+      items: owners.map((o) {
+        final id = o['id']?.toString() ?? '';
+        String label;
+        if (_ownerType == 'EQUIPMENT') {
+          final name = o['name']?.toString() ?? o['equipmentName']?.toString() ?? '';
+          final plate = o['vehicleNumber']?.toString() ?? o['plateNumber']?.toString() ?? '';
+          label = name.isNotEmpty ? '$name ($plate)' : (plate.isNotEmpty ? plate : id);
+        } else {
+          final name = o['name']?.toString() ?? o['personName']?.toString() ?? '';
+          final type = o['type']?.toString() ?? o['personType']?.toString() ?? '';
+          label = name.isNotEmpty ? '$name ($type)' : id;
+        }
+        return DropdownMenuItem<String>(value: id, child: Text(label, overflow: TextOverflow.ellipsis));
+      }).toList(),
+      onChanged: (val) {
+        if (val != null) {
+          setState(() => _ownerIdController.text = val);
+        }
+      },
+    );
+  }
+
+  Future<void> _loadOwnerLists() async {
+    try {
+      final dioClient = context.read<DioClient>();
+      final eqRes = await dioClient.get<dynamic>(ApiEndpoints.equipments);
+      if (eqRes.statusCode == 200 && eqRes.data != null) {
+        final data = eqRes.data;
+        if (data is List) {
+          _equipmentOwners = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _equipmentOwners = (data['content'] as List).cast<Map<String, dynamic>>();
+        }
+      }
+    } catch (_) {}
+    try {
+      final dioClient = context.read<DioClient>();
+      final pRes = await dioClient.get<dynamic>(ApiEndpoints.persons);
+      if (pRes.statusCode == 200 && pRes.data != null) {
+        final data = pRes.data;
+        if (data is List) {
+          _personOwners = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _personOwners = (data['content'] as List).cast<Map<String, dynamic>>();
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadDocumentTypes() async {
@@ -87,7 +166,8 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
       if (_ownerIdController.text.trim().isNotEmpty) {
         endpoint = '/api/documents/${_ownerIdController.text.trim()}/$_ownerType';
       } else {
-        endpoint = ApiEndpoints.documents;
+        // Default: load all documents (expiring endpoint returns all recent docs)
+        endpoint = ApiEndpoints.documentExpiring;
       }
       final response = await dioClient.get<dynamic>(endpoint);
       if (response.statusCode == 200 && response.data != null) {
@@ -232,15 +312,22 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
 
   void _openInNewTab(String url) {
     try {
-      html.window.open(url, '_blank');
+      if (kIsWeb) {
+        html.window.open(url, '_blank');
+      } else {
+        launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      }
     } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('파일 URL: $url'), backgroundColor: AppColors.primary),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('파일 URL: $url'), backgroundColor: AppColors.primary),
+        );
+      }
     }
   }
 
   void _registerPdfViewer(String docId, String fileUrl) {
+    if (!kIsWeb) return; // Only works on web platform
     final viewType = 'pdf-viewer-$docId';
     if (!_registeredPdfViewers.contains(viewType)) {
       try {
@@ -430,26 +517,8 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
             ),
             child: Row(
               children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _ownerIdController,
-                    decoration: InputDecoration(
-                      hintText: '소유자 ID로 검색...',
-                      hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFF94A3B8)),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 SizedBox(
-                  width: 160,
+                  width: 140,
                   child: DropdownButtonFormField<String>(
                     value: _ownerType,
                     decoration: InputDecoration(
@@ -460,13 +529,21 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
                     items: const [
                       DropdownMenuItem(value: 'EQUIPMENT', child: Text('장비')),
                       DropdownMenuItem(value: 'PERSON', child: Text('인력')),
-                      DropdownMenuItem(value: 'COMPANY', child: Text('회사')),
-                      DropdownMenuItem(value: 'DRIVER', child: Text('기사')),
                     ],
                     onChanged: (val) {
-                      if (val != null) setState(() => _ownerType = val);
+                      if (val != null) {
+                        setState(() {
+                          _ownerType = val;
+                          _ownerIdController.clear();
+                        });
+                      }
                     },
                   ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
+                  child: _buildOwnerDropdown(),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
@@ -477,6 +554,17 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   ),
                   child: const Text('검색'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: () {
+                    setState(() => _ownerIdController.clear());
+                    _loadDocuments();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                  child: const Text('전체'),
                 ),
               ],
             ),
@@ -764,7 +852,7 @@ class _DocumentPreviewPageState extends State<DocumentPreviewPage> {
   Widget _buildPdfPreview(Map<String, dynamic> doc, String fileUrl) {
     final docId = doc['id']?.toString() ?? '';
 
-    if (_isWebPlatform && docId.isNotEmpty) {
+    if (kIsWeb && docId.isNotEmpty) {
       // Register the PDF viewer for this document
       _registerPdfViewer(docId, fileUrl);
       final viewType = 'pdf-viewer-$docId';

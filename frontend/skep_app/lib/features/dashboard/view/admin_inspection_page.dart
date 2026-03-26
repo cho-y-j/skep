@@ -105,10 +105,10 @@ class _AdminInspectionPageState extends State<AdminInspectionPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('안전점검', style: AppTextStyles.headlineLarge),
+                    Text('점검 관리', style: AppTextStyles.headlineLarge),
                     const SizedBox(height: 4),
                     Text(
-                      '전체 안전점검 현황을 확인합니다.',
+                      '전체 점검 현황을 확인합니다.',
                       style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
                     ),
                   ],
