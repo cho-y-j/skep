@@ -30,6 +30,16 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
   bool _personnelAssigned = false;
   bool _equipmentAssigned = false;
 
+  // Assignment state
+  List<Map<String, dynamic>> _equipmentList = [];
+  List<Map<String, dynamic>> _personsList = [];
+  bool _isLoadingAssignment = false;
+  int? _selectedEquipmentId;
+  int? _selectedDriverId;
+  List<int> _selectedGuideIds = [];
+  Map<String, dynamic>? _currentAssignment;
+  bool _isLoadingCurrentAssignment = false;
+
   @override
   void initState() {
     super.initState();
@@ -86,6 +96,115 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
       _errorChecklist = e.toString();
     }
     if (mounted) setState(() => _isLoadingChecklist = false);
+
+    // Also load assignment data
+    _loadEquipmentAndPersons();
+  }
+
+  Future<void> _loadEquipmentAndPersons() async {
+    setState(() => _isLoadingAssignment = true);
+    try {
+      final dioClient = context.read<DioClient>();
+      final equipRes = await dioClient.get<dynamic>(ApiEndpoints.equipments);
+      final personsRes = await dioClient.get<dynamic>(ApiEndpoints.persons);
+
+      if (equipRes.statusCode == 200 && equipRes.data != null) {
+        final data = equipRes.data;
+        if (data is List) {
+          _equipmentList = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _equipmentList = (data['content'] as List).cast<Map<String, dynamic>>();
+        }
+      }
+      if (personsRes.statusCode == 200 && personsRes.data != null) {
+        final data = personsRes.data;
+        if (data is List) {
+          _personsList = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _personsList = (data['content'] as List).cast<Map<String, dynamic>>();
+        }
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _isLoadingAssignment = false);
+  }
+
+  Future<void> _loadCurrentAssignment(int equipmentId) async {
+    setState(() {
+      _isLoadingCurrentAssignment = true;
+      _currentAssignment = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final url = '/api/equipment/$equipmentId/current-assignment';
+      final response = await dioClient.get<dynamic>(url);
+      if (response.statusCode == 200 && response.data != null) {
+        _currentAssignment = response.data is Map<String, dynamic> ? response.data : null;
+      }
+    } catch (_) {
+      _currentAssignment = null;
+    }
+    if (mounted) setState(() => _isLoadingCurrentAssignment = false);
+  }
+
+  Future<void> _assignEquipment() async {
+    if (_selectedEquipmentId == null || _selectedDriverId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('장비와 기사를 선택해주세요'), backgroundColor: AppColors.warning),
+      );
+      return;
+    }
+    try {
+      final dioClient = context.read<DioClient>();
+      final url = '/api/equipment/$_selectedEquipmentId/assign';
+      await dioClient.post<dynamic>(url, data: {
+        'driverId': _selectedDriverId,
+        'guideIds': _selectedGuideIds,
+      });
+
+      // Auto-check personnel and equipment assigned
+      setState(() {
+        _personnelAssigned = true;
+        _equipmentAssigned = true;
+      });
+      _updateChecklist();
+
+      // Reload current assignment
+      await _loadCurrentAssignment(_selectedEquipmentId!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('배정이 완료되었습니다'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('배정 실패: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _drivers =>
+      _personsList.where((p) {
+        final type = (p['type'] ?? p['personType'] ?? p['role'] ?? '').toString().toUpperCase();
+        return type == 'DRIVER';
+      }).toList();
+
+  List<Map<String, dynamic>> get _guides =>
+      _personsList.where((p) {
+        final type = (p['type'] ?? p['personType'] ?? p['role'] ?? '').toString().toUpperCase();
+        return type == 'GUIDE';
+      }).toList();
+
+  String _personName(Map<String, dynamic> p) =>
+      p['name']?.toString() ?? p['personName']?.toString() ?? '-';
+
+  String _equipmentName(Map<String, dynamic> e) {
+    final name = e['name']?.toString() ?? e['equipmentName']?.toString() ?? '';
+    final model = e['modelName']?.toString() ?? e['model']?.toString() ?? '';
+    if (name.isNotEmpty && model.isNotEmpty) return '$name ($model)';
+    return name.isNotEmpty ? name : model.isNotEmpty ? model : '장비 #${e['id']}';
   }
 
   Future<void> _updateChecklist() async {
@@ -299,6 +418,11 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
           const SizedBox(height: 20),
           // Checklist content
           if (_selectedPlanId != null) _buildChecklistContent(),
+          // Assignment section
+          if (_selectedPlanId != null && _checklist != null) ...[
+            const SizedBox(height: 20),
+            _buildAssignmentSection(),
+          ],
         ],
       ),
     );
@@ -347,7 +471,13 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
       }).toList(),
       onChanged: (val) {
         if (val != null) {
-          setState(() => _selectedPlanId = val);
+          setState(() {
+            _selectedPlanId = val;
+            _selectedEquipmentId = null;
+            _selectedDriverId = null;
+            _selectedGuideIds = [];
+            _currentAssignment = null;
+          });
           _loadChecklist(val);
         }
       },
@@ -501,6 +631,212 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAssignmentSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.assignment_ind_outlined, size: 20, color: Color(0xFF1E293B)),
+              const SizedBox(width: 8),
+              const Text('배정 관리', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+            ],
+          ),
+          const Divider(height: 32),
+
+          if (_isLoadingAssignment)
+            const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
+          else ...[
+            // Equipment dropdown
+            DropdownButtonFormField<int>(
+              value: _selectedEquipmentId,
+              decoration: const InputDecoration(
+                labelText: '장비 선택',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.construction, size: 20),
+              ),
+              items: _equipmentList.map((e) {
+                final id = e['id'] is int ? e['id'] as int : int.tryParse(e['id'].toString());
+                return DropdownMenuItem<int>(
+                  value: id,
+                  child: Text(_equipmentName(e)),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() => _selectedEquipmentId = val);
+                if (val != null) _loadCurrentAssignment(val);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Driver dropdown
+            DropdownButtonFormField<int>(
+              value: _selectedDriverId,
+              decoration: const InputDecoration(
+                labelText: '기사 선택 (DRIVER)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person, size: 20),
+              ),
+              items: _drivers.map((p) {
+                final id = p['id'] is int ? p['id'] as int : int.tryParse(p['id'].toString());
+                return DropdownMenuItem<int>(
+                  value: id,
+                  child: Text(_personName(p)),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() => _selectedDriverId = val);
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Guide multi-select
+            const Text('유도원 선택 (GUIDE)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: _guides.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Text('등록된 유도원이 없습니다', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+                    )
+                  : Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: _guides.map((p) {
+                        final id = p['id'] is int ? p['id'] as int : int.tryParse(p['id'].toString()) ?? 0;
+                        final selected = _selectedGuideIds.contains(id);
+                        return FilterChip(
+                          label: Text(_personName(p)),
+                          selected: selected,
+                          onSelected: (isSelected) {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedGuideIds.add(id);
+                              } else {
+                                _selectedGuideIds.remove(id);
+                              }
+                            });
+                          },
+                          selectedColor: AppColors.primary.withOpacity(0.15),
+                          checkmarkColor: AppColors.primary,
+                          labelStyle: TextStyle(
+                            fontSize: 13,
+                            color: selected ? AppColors.primary : const Color(0xFF64748B),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+            const SizedBox(height: 20),
+
+            // Assign button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _assignEquipment,
+                icon: const Icon(Icons.check_circle_outline, size: 18),
+                label: const Text('배정'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+
+            // Current assignment summary
+            if (_isLoadingCurrentAssignment) ...[
+              const SizedBox(height: 20),
+              const Center(child: CircularProgressIndicator()),
+            ] else if (_currentAssignment != null) ...[
+              const SizedBox(height: 20),
+              _buildAssignmentSummary(),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssignmentSummary() {
+    final a = _currentAssignment!;
+    final driverName = a['driverName']?.toString() ??
+        a['driver']?['name']?.toString() ??
+        '-';
+    final equipName = a['equipmentName']?.toString() ??
+        a['equipment']?['name']?.toString() ??
+        '-';
+
+    // Guides can be a list or nested
+    String guidesStr = '-';
+    final guides = a['guides'] ?? a['guideNames'];
+    if (guides is List) {
+      final names = guides.map((g) {
+        if (g is Map) return g['name']?.toString() ?? '-';
+        return g.toString();
+      }).toList();
+      if (names.isNotEmpty) guidesStr = names.join(', ');
+    } else if (guides is String && guides.isNotEmpty) {
+      guidesStr = guides;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.info_outline, size: 16, color: Color(0xFF16A34A)),
+              SizedBox(width: 6),
+              Text('현재 배정 현황', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _summaryRow('장비', equipName, Icons.construction),
+          const SizedBox(height: 6),
+          _summaryRow('기사', driverName, Icons.person),
+          const SizedBox(height: 6),
+          _summaryRow('유도원', guidesStr, Icons.people),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF64748B)),
+        const SizedBox(width: 8),
+        Text('$label: ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+        Expanded(
+          child: Text(value, style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
+        ),
+      ],
     );
   }
 

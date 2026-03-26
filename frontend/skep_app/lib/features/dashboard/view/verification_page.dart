@@ -36,10 +36,18 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
   bool _cargoLoading = false;
   String? _cargoError;
 
+  // 일괄 검증
+  List<Map<String, dynamic>> _allDrivers = [];
+  bool _isLoadingDrivers = false;
+  bool _isBatchVerifying = false;
+  int _batchTotal = 0;
+  int _batchCompleted = 0;
+  Map<int, Map<String, dynamic>> _batchResults = {};
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -144,6 +152,136 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
     if (mounted) setState(() => _cargoLoading = false);
   }
 
+  // === Batch verification ===
+
+  Future<void> _loadAllDrivers() async {
+    setState(() {
+      _isLoadingDrivers = true;
+      _allDrivers = [];
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.persons);
+      List<Map<String, dynamic>> all = [];
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          all = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          all = (data['content'] as List).cast<Map<String, dynamic>>();
+        }
+      }
+      // Filter DRIVER type only
+      _allDrivers = all.where((p) {
+        final type = (p['type'] ?? p['personType'] ?? p['role'] ?? '').toString().toUpperCase();
+        return type == 'DRIVER';
+      }).toList();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('기사 목록 로딩 실패: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+    if (mounted) setState(() => _isLoadingDrivers = false);
+  }
+
+  Future<void> _batchVerifyAll() async {
+    if (_allDrivers.isEmpty) return;
+    setState(() {
+      _isBatchVerifying = true;
+      _batchTotal = _allDrivers.length;
+      _batchCompleted = 0;
+      _batchResults = {};
+    });
+
+    final dioClient = context.read<DioClient>();
+
+    for (int i = 0; i < _allDrivers.length; i++) {
+      final driver = _allDrivers[i];
+      final driverId = driver['id'];
+      final name = driver['name']?.toString() ?? driver['personName']?.toString() ?? '';
+      final licenseNumber = driver['licenseNumber']?.toString() ??
+          driver['driverLicenseNumber']?.toString() ?? '';
+
+      if (name.isEmpty || licenseNumber.isEmpty) {
+        _batchResults[i] = {
+          'result': 'UNKNOWN',
+          'message': '면허번호 또는 이름 정보 없음',
+        };
+        setState(() => _batchCompleted = i + 1);
+        continue;
+      }
+
+      try {
+        final response = await dioClient.post<dynamic>(
+          '/api/documents/verify/driver-license',
+          data: {
+            'licenseNumber': licenseNumber,
+            'name': name,
+          },
+        );
+        if (response.statusCode == 200 && response.data != null) {
+          _batchResults[i] = response.data is Map<String, dynamic>
+              ? response.data as Map<String, dynamic>
+              : {'result': response.data.toString()};
+        } else {
+          _batchResults[i] = {'result': 'UNKNOWN', 'message': 'No response data'};
+        }
+      } catch (e) {
+        _batchResults[i] = {'result': 'UNKNOWN', 'message': e.toString()};
+      }
+
+      if (mounted) setState(() => _batchCompleted = i + 1);
+    }
+
+    if (mounted) setState(() => _isBatchVerifying = false);
+  }
+
+  Future<void> _verifySingleDriver(int index) async {
+    final driver = _allDrivers[index];
+    final name = driver['name']?.toString() ?? driver['personName']?.toString() ?? '';
+    final licenseNumber = driver['licenseNumber']?.toString() ??
+        driver['driverLicenseNumber']?.toString() ?? '';
+
+    if (name.isEmpty || licenseNumber.isEmpty) {
+      setState(() {
+        _batchResults[index] = {
+          'result': 'UNKNOWN',
+          'message': '면허번호 또는 이름 정보 없음',
+        };
+      });
+      return;
+    }
+
+    // Mark as loading
+    setState(() {
+      _batchResults[index] = {'result': 'LOADING'};
+    });
+
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.post<dynamic>(
+        '/api/documents/verify/driver-license',
+        data: {
+          'licenseNumber': licenseNumber,
+          'name': name,
+        },
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        _batchResults[index] = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : {'result': response.data.toString()};
+      } else {
+        _batchResults[index] = {'result': 'UNKNOWN', 'message': 'No response data'};
+      }
+    } catch (e) {
+      _batchResults[index] = {'result': 'UNKNOWN', 'message': e.toString()};
+    }
+
+    if (mounted) setState(() {});
+  }
+
   Color _resultCardColor(Map<String, dynamic>? result) {
     if (result == null) return Colors.transparent;
     final status = (result['result'] ?? result['status'] ?? result['valid'] ?? '').toString().toUpperCase();
@@ -165,6 +303,33 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
       return '확인 불가';
     } else {
       return '검증 실패';
+    }
+  }
+
+  String _batchStatusText(Map<String, dynamic>? result) {
+    if (result == null) return '미검증';
+    final status = (result['result'] ?? result['status'] ?? result['valid'] ?? '').toString().toUpperCase();
+    if (status == 'LOADING') return '검증 중...';
+    if (status == 'VALID' || status == 'TRUE' || status == 'SUCCESS' || status == '01') return 'VALID';
+    if (status == 'INVALID' || status == 'FALSE' || status == 'FAIL') return 'INVALID';
+    if (status == 'UNKNOWN' || status == 'PENDING') return 'UNKNOWN';
+    return status.isEmpty ? '미검증' : status;
+  }
+
+  Color _batchStatusColor(String statusText) {
+    switch (statusText) {
+      case 'VALID':
+        return const Color(0xFF16A34A);
+      case 'INVALID':
+        return const Color(0xFFDC2626);
+      case 'UNKNOWN':
+        return const Color(0xFFD97706);
+      case '미검증':
+        return const Color(0xFF94A3B8);
+      case '검증 중...':
+        return AppColors.primary;
+      default:
+        return const Color(0xFF64748B);
     }
   }
 
@@ -198,20 +363,23 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
                   unselectedLabelColor: const Color(0xFF64748B),
                   indicatorColor: AppColors.primary,
                   labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  isScrollable: true,
                   tabs: const [
                     Tab(text: '운전면허 검증'),
                     Tab(text: '사업자등록 검증'),
                     Tab(text: '화물자격 검증'),
+                    Tab(text: '일괄 검증'),
                   ],
                 ),
                 SizedBox(
-                  height: 500,
+                  height: 600,
                   child: TabBarView(
                     controller: _tabController,
                     children: [
                       _buildDriverLicenseTab(),
                       _buildBusinessRegistrationTab(),
                       _buildCargoTab(),
+                      _buildBatchVerificationTab(),
                     ],
                   ),
                 ),
@@ -380,6 +548,164 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
             if (_cargoResult != null) _buildResultCard(_cargoResult!),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBatchVerificationTab() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('일괄 면허 검증', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+          const SizedBox(height: 4),
+          Text('등록된 전체 기사의 운전면허를 일괄 검증합니다.', style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              ElevatedButton.icon(
+                onPressed: _isLoadingDrivers ? null : _loadAllDrivers,
+                icon: _isLoadingDrivers
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.download_outlined, size: 18),
+                label: const Text('기사 목록 불러오기'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.white,
+                  foregroundColor: AppColors.greyDark,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: (_allDrivers.isEmpty || _isBatchVerifying) ? null : _batchVerifyAll,
+                icon: _isBatchVerifying
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.verified_outlined, size: 18),
+                label: const Text('전체 검증'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
+                ),
+              ),
+              const SizedBox(width: 16),
+              if (_allDrivers.isNotEmpty)
+                Text(
+                  '총 ${_allDrivers.length}명',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                ),
+            ],
+          ),
+
+          // Progress indicator
+          if (_isBatchVerifying || (_batchCompleted > 0 && _batchTotal > 0)) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: _batchTotal > 0 ? _batchCompleted / _batchTotal : 0,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _isBatchVerifying ? AppColors.primary : const Color(0xFF16A34A),
+                      ),
+                      minHeight: 8,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '$_batchCompleted / $_batchTotal',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Driver table
+          Expanded(
+            child: _allDrivers.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.people_outline, size: 48, color: Color(0xFFCBD5E1)),
+                        const SizedBox(height: 12),
+                        Text(
+                          _isLoadingDrivers ? '기사 목록을 불러오는 중...' : '"기사 목록 불러오기" 버튼을 눌러주세요',
+                          style: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    child: DataTable(
+                      headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                      dataTextStyle: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+                      columnSpacing: 24,
+                      columns: const [
+                        DataColumn(label: Text('#')),
+                        DataColumn(label: Text('이름')),
+                        DataColumn(label: Text('전화번호')),
+                        DataColumn(label: Text('면허번호')),
+                        DataColumn(label: Text('검증 상태')),
+                        DataColumn(label: Text('작업')),
+                      ],
+                      rows: List.generate(_allDrivers.length, (index) {
+                        final driver = _allDrivers[index];
+                        final name = driver['name']?.toString() ?? driver['personName']?.toString() ?? '-';
+                        final phone = driver['phone']?.toString() ?? driver['phoneNumber']?.toString() ?? '-';
+                        final licenseNo = driver['licenseNumber']?.toString() ??
+                            driver['driverLicenseNumber']?.toString() ?? '-';
+                        final result = _batchResults[index];
+                        final statusText = _batchStatusText(result);
+                        final statusColor = _batchStatusColor(statusText);
+
+                        return DataRow(cells: [
+                          DataCell(Text('${index + 1}')),
+                          DataCell(Text(name)),
+                          DataCell(Text(phone)),
+                          DataCell(Text(licenseNo)),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            statusText == '검증 중...'
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : TextButton(
+                                    onPressed: _isBatchVerifying ? null : () => _verifySingleDriver(index),
+                                    child: const Text('개별 검증', style: TextStyle(fontSize: 12)),
+                                  ),
+                          ),
+                        ]);
+                      }),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }

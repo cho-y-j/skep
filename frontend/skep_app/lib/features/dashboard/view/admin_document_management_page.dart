@@ -13,7 +13,8 @@ class AdminDocumentManagementPage extends StatefulWidget {
 }
 
 class _AdminDocumentManagementPageState
-    extends State<AdminDocumentManagementPage> {
+    extends State<AdminDocumentManagementPage>
+    with SingleTickerProviderStateMixin {
   String _filterExpiry = '전체';
   String _filterDocType = '전체';
   String _filterSupplier = '전체';
@@ -28,14 +29,20 @@ class _AdminDocumentManagementPageState
   // API data
   List<Map<String, dynamic>> _documents = [];
   List<String> _docTypes = ['전체'];
+  List<Map<String, dynamic>> _documentTypeObjects = [];
   bool _isLoading = true;
+  bool _isLoadingTypes = false;
   String? _error;
 
   final List<String> _expiryOptions = ['전체', 'D-7 이내', 'D-14 이내', 'D-30 이내', '만료'];
 
+  // Tab controller for main sections
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
       _loadDocTypes();
@@ -45,6 +52,7 @@ class _AdminDocumentManagementPageState
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -102,30 +110,37 @@ class _AdminDocumentManagementPageState
   }
 
   Future<void> _loadDocTypes() async {
+    setState(() => _isLoadingTypes = true);
     try {
       final dioClient = context.read<DioClient>();
       final response = await dioClient.get<dynamic>(ApiEndpoints.documentTypes);
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         List<String> types = ['전체'];
+        List<Map<String, dynamic>> typeObjects = [];
         if (data is List) {
           for (var item in data) {
             if (item is String) {
               types.add(item);
+              typeObjects.add({'name': item});
             } else if (item is Map) {
-              types.add(item['name']?.toString() ?? item['typeName']?.toString() ?? '');
+              final name = item['name']?.toString() ?? item['typeName']?.toString() ?? '';
+              if (name.isNotEmpty) types.add(name);
+              typeObjects.add(Map<String, dynamic>.from(item));
             }
           }
         }
         if (mounted) {
           setState(() {
             _docTypes = types;
+            _documentTypeObjects = typeObjects;
           });
         }
       }
     } catch (_) {
       // Keep default doc types
     }
+    if (mounted) setState(() => _isLoadingTypes = false);
   }
 
   String _getDocName(Map<String, dynamic> d) {
@@ -251,6 +266,311 @@ class _AdminDocumentManagementPageState
     });
   }
 
+  // ==================== Document Type CRUD ====================
+  void _showAddTypeDialog() {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    bool ocrRequired = false;
+    bool validationRequired = false;
+    bool expiryManaged = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('서류 유형 추가'),
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // TODO: POST /api/documents/types endpoint가 준비되면 실제 저장 구현
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 18, color: AppColors.warning),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'API 준비 중 - 현재 조회만 가능합니다',
+                                style: TextStyle(fontSize: 13, color: Color(0xFF92400E)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '유형명',
+                          hintText: '예: 건설기계 등록증',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: '설명',
+                          hintText: '서류 유형에 대한 설명',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: const Text('OCR 필요 여부', style: TextStyle(fontSize: 14)),
+                        subtitle: const Text('업로드 시 OCR 자동 인식', style: TextStyle(fontSize: 12)),
+                        value: ocrRequired,
+                        onChanged: (v) => setDialogState(() => ocrRequired = v),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      SwitchListTile(
+                        title: const Text('검증 필요 여부', style: TextStyle(fontSize: 14)),
+                        subtitle: const Text('관리자 승인 후 유효 처리', style: TextStyle(fontSize: 12)),
+                        value: validationRequired,
+                        onChanged: (v) => setDialogState(() => validationRequired = v),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      SwitchListTile(
+                        title: const Text('만료일 관리', style: TextStyle(fontSize: 14)),
+                        subtitle: const Text('만료일 추적 및 알림', style: TextStyle(fontSize: 12)),
+                        value: expiryManaged,
+                        onChanged: (v) => setDialogState(() => expiryManaged = v),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('취소'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    // TODO: POST /api/documents/types 구현 시 실제 저장
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('서류 유형 추가 API가 준비 중입니다.'),
+                        backgroundColor: AppColors.warning,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                  ),
+                  child: const Text('추가'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditTypeDialog(Map<String, dynamic> typeObj) {
+    final nameCtrl = TextEditingController(text: typeObj['name']?.toString() ?? typeObj['typeName']?.toString() ?? '');
+    final descCtrl = TextEditingController(text: typeObj['description']?.toString() ?? '');
+    bool ocrRequired = typeObj['ocrRequired'] == true;
+    bool validationRequired = typeObj['validationRequired'] == true;
+    bool expiryManaged = typeObj['expiryManaged'] == true || typeObj['hasExpiry'] == true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('서류 유형 수정'),
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // TODO: PUT /api/documents/types/{id} endpoint가 준비되면 실제 수정 구현
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 18, color: AppColors.warning),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'API 준비 중 - 현재 조회만 가능합니다',
+                                style: TextStyle(fontSize: 13, color: Color(0xFF92400E)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '유형명',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: '설명',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: const Text('OCR 필요 여부', style: TextStyle(fontSize: 14)),
+                        value: ocrRequired,
+                        onChanged: (v) => setDialogState(() => ocrRequired = v),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      SwitchListTile(
+                        title: const Text('검증 필요 여부', style: TextStyle(fontSize: 14)),
+                        value: validationRequired,
+                        onChanged: (v) => setDialogState(() => validationRequired = v),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      SwitchListTile(
+                        title: const Text('만료일 관리', style: TextStyle(fontSize: 14)),
+                        value: expiryManaged,
+                        onChanged: (v) => setDialogState(() => expiryManaged = v),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('취소'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    // TODO: PUT /api/documents/types/{id} 구현 시 실제 수정
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('서류 유형 수정 API가 준비 중입니다.'),
+                        backgroundColor: AppColors.warning,
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                  ),
+                  child: const Text('저장'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteTypeDialog(Map<String, dynamic> typeObj) {
+    final name = typeObj['name']?.toString() ?? typeObj['typeName']?.toString() ?? '알 수 없음';
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('서류 유형 삭제'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // TODO: DELETE /api/documents/types/{id} endpoint가 준비되면 실제 삭제 구현
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: AppColors.warning),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'API 준비 중 - 현재 조회만 가능합니다',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF92400E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text("'$name' 유형을 삭제하시겠습니까?"),
+              const SizedBox(height: 8),
+              const Text(
+                '이 유형에 속한 서류가 있는 경우 삭제할 수 없습니다.',
+                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // TODO: DELETE /api/documents/types/{id} 구현 시 실제 삭제
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('서류 유형 삭제 API가 준비 중입니다.'),
+                    backgroundColor: AppColors.warning,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: AppColors.white,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredDocs = _filtered;
@@ -267,12 +587,15 @@ class _AdminDocumentManagementPageState
                   children: [
                     const Text('서류 관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
                     const SizedBox(height: 4),
-                    Text('만료 임박 서류를 확인하고 관리합니다. (D-30 이내)', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                    Text('만료 임박 서류를 확인하고 관리합니다.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                   ],
                 ),
               ),
               ElevatedButton.icon(
-                onPressed: _loadData,
+                onPressed: () {
+                  _loadData();
+                  _loadDocTypes();
+                },
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('새로고침'),
                 style: ElevatedButton.styleFrom(
@@ -284,15 +607,217 @@ class _AdminDocumentManagementPageState
             ],
           ),
           const SizedBox(height: 20),
+          // Tabs: 서류 유형 관리 | 만료 서류 목록
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                TabBar(
+                  controller: _tabController,
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.grey,
+                  indicatorColor: AppColors.primary,
+                  indicatorWeight: 3,
+                  labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  tabs: const [
+                    Tab(text: '서류 유형 관리'),
+                    Tab(text: '만료 서류 목록'),
+                  ],
+                  onTap: (_) => setState(() {}),
+                ),
+                const Divider(height: 1),
+                AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) {
+                    if (_tabController.index == 0) {
+                      return _buildDocTypeManagement();
+                    } else {
+                      return _buildDocumentListSection(filteredDocs);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== Document Type Management ====================
+  Widget _buildDocTypeManagement() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                '서류 유형 관리',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+              ),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: _showAddTypeDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('유형 추가'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_isLoadingTypes)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_documentTypeObjects.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.category_outlined, size: 48, color: Color(0xFFCBD5E1)),
+                    const SizedBox(height: 12),
+                    const Text('등록된 서류 유형이 없습니다', style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8))),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _loadDocTypes,
+                      child: const Text('다시 불러오기'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth > 800 ? 3 : (constraints.maxWidth > 500 ? 2 : 1);
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 2.2,
+                  ),
+                  itemCount: _documentTypeObjects.length,
+                  itemBuilder: (context, index) {
+                    final typeObj = _documentTypeObjects[index];
+                    return _buildTypeCard(typeObj);
+                  },
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeCard(Map<String, dynamic> typeObj) {
+    final name = typeObj['name']?.toString() ?? typeObj['typeName']?.toString() ?? '-';
+    final desc = typeObj['description']?.toString() ?? '';
+    final hasOcr = typeObj['ocrRequired'] == true;
+    final hasValidation = typeObj['validationRequired'] == true;
+    final hasExpiry = typeObj['expiryManaged'] == true || typeObj['hasExpiry'] == true;
+    final code = typeObj['code']?.toString() ?? typeObj['id']?.toString() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.description_outlined, size: 18, color: AppColors.primary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)), overflow: TextOverflow.ellipsis),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8)),
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 16), SizedBox(width: 8), Text('수정')])),
+                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, size: 16, color: AppColors.error), SizedBox(width: 8), Text('삭제', style: TextStyle(color: AppColors.error))])),
+                ],
+                onSelected: (val) {
+                  if (val == 'edit') _showEditTypeDialog(typeObj);
+                  if (val == 'delete') _showDeleteTypeDialog(typeObj);
+                },
+              ),
+            ],
+          ),
+          if (desc.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(desc, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), maxLines: 1, overflow: TextOverflow.ellipsis),
+          ],
+          if (code.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text('코드: $code', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+          ],
+          const Spacer(),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              if (hasOcr) _buildBadge('OCR', AppColors.info),
+              if (hasValidation) _buildBadge('검증', AppColors.warning),
+              if (hasExpiry) _buildBadge('만료관리', AppColors.success),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+
+  // ==================== Document List Section ====================
+  Widget _buildDocumentListSection(List<Map<String, dynamic>> filteredDocs) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           // 검색 & 필터
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
             ),
             child: Column(
               children: [
@@ -307,7 +832,7 @@ class _AdminDocumentManagementPageState
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
+                    fillColor: AppColors.white,
                   ),
                   onChanged: (v) => setState(() => _searchQuery = v),
                 ),
@@ -347,16 +872,7 @@ class _AdminDocumentManagementPageState
             ),
           ),
           const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
-            ),
-            child: _buildContent(filteredDocs),
-          ),
+          _buildContent(filteredDocs),
         ],
       ),
     );
@@ -394,10 +910,10 @@ class _AdminDocumentManagementPageState
         padding: const EdgeInsets.all(48),
         child: Center(
           child: Column(
-            children: [
-              const Icon(Icons.description_outlined, size: 56, color: Color(0xFFCBD5E1)),
-              const SizedBox(height: 16),
-              const Text('만료 임박 서류가 없습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+            children: const [
+              Icon(Icons.description_outlined, size: 56, color: Color(0xFFCBD5E1)),
+              SizedBox(height: 16),
+              Text('만료 임박 서류가 없습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
             ],
           ),
         ),
@@ -424,51 +940,57 @@ class _AdminDocumentManagementPageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Text('총 ${filteredDocs.length}건', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            sortColumnIndex: _sortColumnIndex,
-            sortAscending: _sortAscending,
-            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-            headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-            dataTextStyle: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-            columns: [
-              DataColumn(label: const Text('서류명'), onSort: _onSort),
-              DataColumn(label: const Text('소속'), onSort: _onSort),
-              DataColumn(label: const Text('구분'), onSort: _onSort),
-              DataColumn(label: const Text('공급사'), onSort: _onSort),
-              DataColumn(label: const Text('만료일'), onSort: _onSort),
-              DataColumn(label: const Text('D-Day'), onSort: _onSort),
-              const DataColumn(label: Text('상태')),
-            ],
-            rows: filteredDocs.map((d) {
-              final dDay = _getDDay(d);
-              final status = _getStatus(d);
-              return DataRow(cells: [
-                DataCell(Text(_getDocName(d))),
-                DataCell(Text(_getOwner(d))),
-                DataCell(Text(_getOwnerType(d))),
-                DataCell(Text(_getSupplier(d))),
-                DataCell(Text(_getExpiryDate(d))),
-                DataCell(Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: _dDayColor(dDay).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                  child: Text(_dDayText(dDay), style: TextStyle(color: _dDayColor(dDay), fontSize: 12, fontWeight: FontWeight.bold)),
-                )),
-                DataCell(Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: dDay < 0 ? AppColors.error.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(status, style: TextStyle(color: dDay < 0 ? AppColors.error : AppColors.warning, fontSize: 12, fontWeight: FontWeight.w600)),
-                )),
-              ]);
-            }).toList(),
+        Text('총 ${filteredDocs.length}건', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+              headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+              dataTextStyle: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+              columns: [
+                DataColumn(label: const Text('서류명'), onSort: _onSort),
+                DataColumn(label: const Text('소속'), onSort: _onSort),
+                DataColumn(label: const Text('구분'), onSort: _onSort),
+                DataColumn(label: const Text('공급사'), onSort: _onSort),
+                DataColumn(label: const Text('만료일'), onSort: _onSort),
+                DataColumn(label: const Text('D-Day'), onSort: _onSort),
+                const DataColumn(label: Text('상태')),
+              ],
+              rows: filteredDocs.map((d) {
+                final dDay = _getDDay(d);
+                final status = _getStatus(d);
+                return DataRow(cells: [
+                  DataCell(Text(_getDocName(d))),
+                  DataCell(Text(_getOwner(d))),
+                  DataCell(Text(_getOwnerType(d))),
+                  DataCell(Text(_getSupplier(d))),
+                  DataCell(Text(_getExpiryDate(d))),
+                  DataCell(Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: _dDayColor(dDay).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                    child: Text(_dDayText(dDay), style: TextStyle(color: _dDayColor(dDay), fontSize: 12, fontWeight: FontWeight.bold)),
+                  )),
+                  DataCell(Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: dDay < 0 ? AppColors.error.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(status, style: TextStyle(color: dDay < 0 ? AppColors.error : AppColors.warning, fontSize: 12, fontWeight: FontWeight.w600)),
+                  )),
+                ]);
+              }).toList(),
+            ),
           ),
         ),
       ],
