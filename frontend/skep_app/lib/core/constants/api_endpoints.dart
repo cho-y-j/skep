@@ -61,6 +61,17 @@ class ApiEndpoints {
   static const String settlement = '/api/settlement/{id}';
   static const String settlementGenerate = '/api/settlement/generate';
 
+  // Document type CRUD
+  static const String documentTypeCreate = '/api/documents/types';
+  static const String documentTypeUpdate = '/api/documents/types/{id}';
+  static const String documentTypeDelete = '/api/documents/types/{id}';
+
+  // Equipment type CRUD
+  static const String equipmentTypes = '/api/equipment/types';
+  static const String equipmentTypeCreate = '/api/equipment/types';
+  static const String equipmentTypeUpdate = '/api/equipment/types/{id}';
+  static const String equipmentTypeDelete = '/api/equipment/types/{id}';
+
   // Statistics endpoints
   static const String statistics = '/api/statistics';
 

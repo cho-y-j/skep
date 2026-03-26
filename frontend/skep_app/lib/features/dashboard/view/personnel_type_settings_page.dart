@@ -6,9 +6,9 @@ import 'package:skep_app/core/constants/api_endpoints.dart';
 import 'package:skep_app/core/network/dio_client.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
 
-// TODO: Replace local mock data with backend API when personnel-type settings endpoint is available.
-// Currently no dedicated endpoint exists for personnel type configurations.
-// Candidate: GET/POST /api/equipment/persons/types (not yet in ApiEndpoints)
+// Person types are system-defined enums (DRIVER, GUIDE, SAFETY_INSPECTOR) stored in equipment-service.
+// There is no dedicated CRUD endpoint for person types since they are enum-based.
+// The list below is a static configuration matching the backend enum values.
 
 class PersonnelTypeSettingsPage extends StatefulWidget {
   const PersonnelTypeSettingsPage({Key? key}) : super(key: key);
