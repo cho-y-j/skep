@@ -46,6 +46,11 @@ public class QuotationController {
 
     // ===== Quotations =====
 
+    @GetMapping
+    public ResponseEntity<List<Quotation>> getAllQuotations() {
+        return ResponseEntity.ok(quotationService.getAllQuotations());
+    }
+
     @PostMapping
     public ResponseEntity<Quotation> createQuotation(@RequestBody Quotation quotation) {
         Quotation created = quotationService.createQuotation(quotation);

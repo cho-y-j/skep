@@ -113,7 +113,7 @@ services:
 
       # JWT
       JWT_SECRET: ${JWT_SECRET:-your-256bit-base64-encoded-secret-key-here}
-      JWT_EXPIRATION: ${JWT_EXPIRATION_HOURS:-24}
+      JWT_EXPIRATION: ${JWT_EXPIRATION_MS:-86400000}
 
       # AWS
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
@@ -175,7 +175,7 @@ services:
 
       # JWT
       JWT_SECRET: ${JWT_SECRET:-your-256bit-base64-encoded-secret-key-here}
-      JWT_EXPIRATION: ${JWT_EXPIRATION_HOURS:-24}
+      JWT_EXPIRATION: ${JWT_EXPIRATION_MS:-86400000}
 
       # Logging
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}

@@ -56,6 +56,11 @@ public class QuotationService {
     }
 
     @Transactional(readOnly = true)
+    public List<Quotation> getAllQuotations() {
+        return quotationRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
     public List<Quotation> getQuotationsByRequest(UUID requestId) {
         return quotationRepository.findByRequestIdWithItems(requestId);
     }
