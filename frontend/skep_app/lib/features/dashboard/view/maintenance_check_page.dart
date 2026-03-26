@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class MaintenanceCheckPage extends StatefulWidget {
   const MaintenanceCheckPage({Key? key}) : super(key: key);
@@ -9,12 +12,14 @@ class MaintenanceCheckPage extends StatefulWidget {
 }
 
 class _MaintenanceHistory {
+  final int? id;
   final DateTime date;
   final String equipment;
   final int mileage;
   final String status;
 
   const _MaintenanceHistory({
+    this.id,
     required this.date,
     required this.equipment,
     required this.mileage,
@@ -22,15 +27,37 @@ class _MaintenanceHistory {
   });
 
   Color get statusColor {
-    switch (status) {
+    final s = status.toUpperCase();
+    switch (s) {
       case '정상':
+      case 'NORMAL':
+      case 'OK':
         return const Color(0xFF16A34A);
       case '보충필요':
+      case 'REFILL_NEEDED':
         return const Color(0xFFD97706);
       case '점검필요':
+      case 'CHECK_NEEDED':
+      case 'ISSUE':
         return const Color(0xFFDC2626);
       default:
         return const Color(0xFF94A3B8);
+    }
+  }
+
+  String get statusLabel {
+    final s = status.toUpperCase();
+    switch (s) {
+      case 'NORMAL':
+      case 'OK':
+        return '정상';
+      case 'REFILL_NEEDED':
+        return '보충필요';
+      case 'CHECK_NEEDED':
+      case 'ISSUE':
+        return '점검필요';
+      default:
+        return status;
     }
   }
 }
@@ -45,33 +72,103 @@ class _MaintenanceCheckPageState extends State<MaintenanceCheckPage> {
   String _coolant = '정상';
   double _fuelLevel = 50.0;
   bool _showForm = true;
+  bool _isLoading = true;
+  bool _isSubmitting = false;
+  String? _error;
 
-  final List<_MaintenanceHistory> _history = [
-    _MaintenanceHistory(
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      equipment: '25톤 크레인 (서울 가 1234)',
-      mileage: 45230,
-      status: '정상',
-    ),
-    _MaintenanceHistory(
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      equipment: '25톤 크레인 (서울 가 1234)',
-      mileage: 45100,
-      status: '보충필요',
-    ),
-    _MaintenanceHistory(
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      equipment: '50톤 크레인 (경기 나 5678)',
-      mileage: 32400,
-      status: '정상',
-    ),
-    _MaintenanceHistory(
-      date: DateTime.now().subtract(const Duration(days: 5)),
-      equipment: '굴삭기 (서울 다 9012)',
-      mileage: 18900,
-      status: '점검필요',
-    ),
-  ];
+  List<_MaintenanceHistory> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.maintenanceInspections);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<Map<String, dynamic>> rawList;
+        if (data is List) {
+          rawList = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          rawList = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          rawList = [];
+        }
+        _history = rawList.map((item) {
+          DateTime date;
+          try {
+            date = DateTime.parse(item['inspectionDate'] ?? item['date'] ?? item['createdAt'] ?? '');
+          } catch (_) {
+            date = DateTime.now();
+          }
+          return _MaintenanceHistory(
+            id: item['id'],
+            date: date,
+            equipment: item['equipmentName'] ?? item['equipment'] ?? item['vehicleNumber'] ?? '',
+            mileage: item['mileage'] ?? item['odometer'] ?? 0,
+            status: item['status'] ?? item['result'] ?? '정상',
+          );
+        }).toList();
+      }
+    } catch (e) {
+      _error = e.toString();
+      _history = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _submitMaintenance() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.post<dynamic>(
+        ApiEndpoints.maintenanceInspections,
+        data: {
+          'mileage': int.tryParse(_mileageController.text) ?? 0,
+          'engineOil': _engineOil,
+          'hydraulicOil': _hydraulicOil,
+          'coolant': _coolant,
+          'fuelLevel': _fuelLevel.round(),
+          'remarks': _remarksController.text,
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _nfcScanned = false;
+          _mileageController.clear();
+          _remarksController.clear();
+          _engineOil = '정상';
+          _hydraulicOil = '정상';
+          _coolant = '정상';
+          _fuelLevel = 50.0;
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('정비점검이 제출되었습니다.'), backgroundColor: Color(0xFF16A34A)),
+        );
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('제출 실패: $e'), backgroundColor: const Color(0xFFDC2626)),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -397,18 +494,7 @@ class _MaintenanceCheckPageState extends State<MaintenanceCheckPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              setState(() {
-                _nfcScanned = false;
-                _mileageController.clear();
-                _remarksController.clear();
-                _engineOil = '정상';
-                _hydraulicOil = '정상';
-                _coolant = '정상';
-                _fuelLevel = 50.0;
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('정비점검이 제출되었습니다.'), backgroundColor: Color(0xFF16A34A)),
-              );
+              _submitMaintenance();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2196F3),
@@ -423,6 +509,56 @@ class _MaintenanceCheckPageState extends State<MaintenanceCheckPage> {
   }
 
   Widget _buildHistorySection() {
+    if (_isLoading) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(48),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(48),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Color(0xFFDC2626)),
+            const SizedBox(height: 12),
+            const Text('데이터를 불러오는데 실패했습니다', style: TextStyle(color: Color(0xFFDC2626))),
+            const SizedBox(height: 16),
+            TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+          ],
+        ),
+      );
+    }
+    if (_history.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(48),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.inbox_outlined, size: 48, color: Color(0xFF94A3B8)),
+            SizedBox(height: 12),
+            Text('정비 이력이 없습니다', style: TextStyle(color: Color(0xFF94A3B8))),
+          ],
+        ),
+      );
+    }
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -455,7 +591,7 @@ class _MaintenanceCheckPageState extends State<MaintenanceCheckPage> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    h.status,
+                    h.statusLabel,
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: h.statusColor),
                   ),
                 ),

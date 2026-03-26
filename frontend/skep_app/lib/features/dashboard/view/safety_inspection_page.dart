@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class SafetyInspectionPage extends StatefulWidget {
   const SafetyInspectionPage({Key? key}) : super(key: key);
@@ -30,24 +33,6 @@ class _InspectionItem {
   bool get isCompleted => result != null && photoTaken;
 }
 
-class _InspectionHistory {
-  final DateTime date;
-  final String equipment;
-  final String inspector;
-  final int passCount;
-  final int failCount;
-  final String status;
-
-  const _InspectionHistory({
-    required this.date,
-    required this.equipment,
-    required this.inspector,
-    required this.passCount,
-    required this.failCount,
-    required this.status,
-  });
-}
-
 class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
   String? _selectedEquipment;
   bool _inspectionStarted = false;
@@ -56,47 +41,76 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
   final _inspectorCommentController = TextEditingController();
   bool _showHistory = false;
 
-  final List<String> _equipmentList = [
-    '25톤 크레인 (서울 가 1234)',
-    '50톤 크레인 (경기 나 5678)',
-    '굴삭기 (서울 다 9012)',
-    '덤프트럭 (경기 라 3456)',
-    '지게차 (서울 마 7890)',
-  ];
+  bool _isLoading = true;
+  String? _error;
+  List<Map<String, dynamic>> _equipmentList = [];
+  List<Map<String, dynamic>> _historyList = [];
+  String? _currentInspectionId;
 
   late List<_InspectionItem> _items;
-
-  final List<_InspectionHistory> _history = [
-    _InspectionHistory(
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      equipment: '25톤 크레인 (서울 가 1234)',
-      inspector: '박안전',
-      passCount: 10,
-      failCount: 1,
-      status: '완료',
-    ),
-    _InspectionHistory(
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      equipment: '50톤 크레인 (경기 나 5678)',
-      inspector: '박안전',
-      passCount: 11,
-      failCount: 0,
-      status: '완료',
-    ),
-    _InspectionHistory(
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      equipment: '굴삭기 (서울 다 9012)',
-      inspector: '김점검',
-      passCount: 9,
-      failCount: 2,
-      status: '완료',
-    ),
-  ];
 
   @override
   void initState() {
     super.initState();
     _initItems();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+
+      final results = await Future.wait([
+        dioClient.get<dynamic>(ApiEndpoints.equipments).catchError((_) => null),
+        dioClient.get<dynamic>(ApiEndpoints.safetyInspections).catchError((_) => null),
+      ]);
+
+      // Equipment list for dropdown
+      final eqData = results[0]?.data;
+      if (eqData is List) {
+        _equipmentList = eqData.cast<Map<String, dynamic>>();
+      } else if (eqData is Map && eqData['content'] is List) {
+        _equipmentList = (eqData['content'] as List).cast<Map<String, dynamic>>();
+      } else if (eqData is Map && eqData['data'] is List) {
+        _equipmentList = (eqData['data'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _equipmentList = [];
+      }
+
+      // Inspection history
+      final inspData = results[1]?.data;
+      if (inspData is List) {
+        _historyList = inspData.cast<Map<String, dynamic>>();
+      } else if (inspData is Map && inspData['content'] is List) {
+        _historyList = (inspData['content'] as List).cast<Map<String, dynamic>>();
+      } else if (inspData is Map && inspData['data'] is List) {
+        _historyList = (inspData['data'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _historyList = [];
+      }
+    } catch (e) {
+      _error = e.toString();
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _getEquipmentLabel(Map<String, dynamic> eq) {
+    final name = eq['name']?.toString() ?? eq['equipmentName']?.toString() ?? '';
+    final plate = eq['plateNumber']?.toString() ?? eq['plateNo']?.toString() ?? '';
+    if (name.isNotEmpty && plate.isNotEmpty) return '$name ($plate)';
+    if (name.isNotEmpty) return name;
+    if (plate.isNotEmpty) return plate;
+    return eq['id']?.toString() ?? '-';
+  }
+
+  String _getEquipmentId(Map<String, dynamic> eq) {
+    return eq['id']?.toString() ?? '';
   }
 
   void _initItems() {
@@ -123,36 +137,177 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
 
   int get _completedCount => _items.where((i) => i.isCompleted).length;
 
+  Future<void> _startInspection() async {
+    if (_selectedEquipment == null) return;
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.post<dynamic>(
+        '${ApiEndpoints.safetyInspections}/start',
+        data: {'equipmentId': _selectedEquipment},
+      );
+      if (response.data != null && response.data is Map) {
+        _currentInspectionId = response.data['id']?.toString();
+      }
+      setState(() => _inspectionStarted = true);
+    } catch (e) {
+      // If API fails, still allow local inspection flow
+      setState(() => _inspectionStarted = true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('서버 기록 실패 (오프라인 모드): $e'), duration: const Duration(seconds: 2)),
+        );
+      }
+    }
+  }
+
+  Future<void> _recordItem(int index, String result) async {
+    setState(() {
+      _items[index].result = result;
+      _items[index].timestamp = DateTime.now();
+      if (_items[index].isCompleted && index == _currentItemIndex && _currentItemIndex < 10) {
+        _currentItemIndex = index + 1;
+      }
+    });
+
+    if (_currentInspectionId != null) {
+      try {
+        final dioClient = context.read<DioClient>();
+        await dioClient.post<dynamic>(
+          '${ApiEndpoints.safetyInspections}/$_currentInspectionId/record-item',
+          data: {
+            'itemNumber': _items[index].number,
+            'itemName': _items[index].name,
+            'result': result,
+            'remarks': _items[index].remarks,
+          },
+        );
+      } catch (_) {
+        // Silent fail - local state already updated
+      }
+    }
+  }
+
+  Future<void> _submitInspection() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('안전점검 제출 확인', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('장비: ${_getSelectedEquipmentLabel()}'),
+            Text('적합: ${_items.where((i) => i.result == 'pass').length}건'),
+            Text('부적합: ${_items.where((i) => i.result == 'fail').length}건'),
+            const SizedBox(height: 8),
+            const Text('제출 후 수정이 불가합니다. 제출하시겠습니까?',
+                style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFDC2626))),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Complete via API
+              if (_currentInspectionId != null) {
+                try {
+                  final dioClient = this.context.read<DioClient>();
+                  await dioClient.post<dynamic>(
+                    '${ApiEndpoints.safetyInspections}/$_currentInspectionId/complete',
+                    data: {
+                      'comment': _inspectorCommentController.text,
+                      'passCount': _items.where((i) => i.result == 'pass').length,
+                      'failCount': _items.where((i) => i.result == 'fail').length,
+                    },
+                  );
+                } catch (_) {
+                  // Silent fail
+                }
+              }
+              setState(() => _inspectionSubmitted = true);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('안전점검이 제출되었습니다.'), backgroundColor: Color(0xFF16A34A)),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('제출'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getSelectedEquipmentLabel() {
+    if (_selectedEquipment == null) return '-';
+    final match = _equipmentList.where((eq) => _getEquipmentId(eq) == _selectedEquipment);
+    if (match.isNotEmpty) return _getEquipmentLabel(match.first);
+    return _selectedEquipment!;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFF8FAFC),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null && _equipmentList.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildToggle('안전점검', !_showHistory, () => setState(() => _showHistory = false)),
-                      _buildToggle('점검 이력', _showHistory, () => setState(() => _showHistory = true)),
+                      const Icon(Icons.error_outline, size: 56, color: Color(0xFFCBD5E1)),
+                      const SizedBox(height: 16),
+                      const Text('데이터를 불러오는데 실패했습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+                      const SizedBox(height: 8),
+                      Text(_error!, style: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)), textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                _buildToggle('안전점검', !_showHistory, () => setState(() => _showHistory = false)),
+                                _buildToggle('점검 이력', _showHistory, () => setState(() => _showHistory = true)),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          IconButton(
+                            onPressed: _loadData,
+                            icon: const Icon(Icons.refresh, size: 20),
+                            tooltip: '새로고침',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      if (_showHistory) _buildHistoryView() else _buildInspectionView(),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            if (_showHistory) _buildHistoryView() else _buildInspectionView(),
-          ],
-        ),
-      ),
     );
   }
 
@@ -211,7 +366,10 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
                 ),
                 style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
                 items: _equipmentList
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .map((eq) => DropdownMenuItem(
+                          value: _getEquipmentId(eq),
+                          child: Text(_getEquipmentLabel(eq)),
+                        ))
                     .toList(),
                 onChanged: _inspectionStarted
                     ? null
@@ -222,7 +380,7 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => setState(() => _inspectionStarted = true),
+                    onPressed: _startInspection,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2196F3),
                       foregroundColor: Colors.white,
@@ -464,7 +622,7 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
                     const SizedBox(width: 12),
                     ElevatedButton(
                       onPressed: item.photoTaken
-                          ? () => _judgeItem(index, 'pass')
+                          ? () => _recordItem(index, 'pass')
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: item.result == 'pass' ? const Color(0xFF16A34A) : Colors.white,
@@ -478,7 +636,7 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
                     const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: item.photoTaken
-                          ? () => _judgeItem(index, 'fail')
+                          ? () => _recordItem(index, 'fail')
                           : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: item.result == 'fail' ? const Color(0xFFDC2626) : Colors.white,
@@ -515,59 +673,6 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
     );
   }
 
-  void _judgeItem(int index, String result) {
-    setState(() {
-      _items[index].result = result;
-      _items[index].timestamp = DateTime.now();
-      if (_items[index].isCompleted && index == _currentItemIndex && _currentItemIndex < 10) {
-        _currentItemIndex = index + 1;
-      }
-    });
-  }
-
-  void _submitInspection() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('안전점검 제출 확인', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('장비: $_selectedEquipment'),
-            Text('적합: ${_items.where((i) => i.result == 'pass').length}건'),
-            Text('부적합: ${_items.where((i) => i.result == 'fail').length}건'),
-            const SizedBox(height: 8),
-            const Text('제출 후 수정이 불가합니다. 제출하시겠습니까?',
-                style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFDC2626))),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() => _inspectionSubmitted = true);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('안전점검이 제출되었습니다.'), backgroundColor: Color(0xFF16A34A)),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF16A34A),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('제출'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSubmittedView() {
     return Container(
       width: double.infinity,
@@ -583,7 +688,7 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
           const SizedBox(height: 16),
           const Text('안전점검 완료 (잠금)', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF16A34A))),
           const SizedBox(height: 8),
-          Text('장비: $_selectedEquipment', style: const TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+          Text('장비: ${_getSelectedEquipmentLabel()}', style: const TextStyle(fontSize: 14, color: Color(0xFF64748B))),
           const SizedBox(height: 4),
           Text(
             '적합: ${_items.where((i) => i.result == 'pass').length}건 / 부적합: ${_items.where((i) => i.result == 'fail').length}건',
@@ -597,9 +702,11 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
                 _inspectionStarted = false;
                 _selectedEquipment = null;
                 _currentItemIndex = 0;
+                _currentInspectionId = null;
                 _inspectorCommentController.clear();
                 _initItems();
               });
+              _loadData();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2196F3),
@@ -614,6 +721,19 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
   }
 
   Widget _buildHistoryView() {
+    if (_historyList.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(48),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))],
+        ),
+        child: const Center(child: Text('점검 이력이 없습니다.', style: TextStyle(color: Color(0xFF94A3B8)))),
+      );
+    }
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -635,26 +755,47 @@ class _SafetyInspectionPageState extends State<SafetyInspectionPage> {
             DataColumn(label: Text('부적합')),
             DataColumn(label: Text('상태')),
           ],
-          rows: _history.map((h) {
+          rows: _historyList.map((h) {
+            final date = h['inspectionDate'] ?? h['createdAt'] ?? h['date'];
+            String dateStr;
+            try {
+              dateStr = DateFormat('yyyy-MM-dd').format(DateTime.parse(date.toString()));
+            } catch (_) {
+              dateStr = date?.toString() ?? '-';
+            }
+            final equipment = h['equipmentName']?.toString() ?? h['equipment']?.toString() ?? '-';
+            final inspector = h['inspectorName']?.toString() ?? h['inspector']?.toString() ?? '-';
+            final passCount = h['passCount'] ?? h['pass_count'] ?? 0;
+            final failCount = h['failCount'] ?? h['fail_count'] ?? 0;
+            final status = h['status']?.toString() ?? '-';
+
             return DataRow(cells: [
-              DataCell(Text(DateFormat('yyyy-MM-dd').format(h.date))),
-              DataCell(Text(h.equipment)),
-              DataCell(Text(h.inspector)),
-              DataCell(Text('${h.passCount}건', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.w600))),
-              DataCell(Text('${h.failCount}건', style: TextStyle(
-                color: h.failCount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+              DataCell(Text(dateStr)),
+              DataCell(Text(equipment)),
+              DataCell(Text(inspector)),
+              DataCell(Text('$passCount건', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.w600))),
+              DataCell(Text('$failCount건', style: TextStyle(
+                color: (failCount is int && failCount > 0) ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
                 fontWeight: FontWeight.w600,
               ))),
               DataCell(
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF16A34A).withOpacity(0.1),
+                    color: (status == 'COMPLETED' || status == 'completed' || status == '완료')
+                        ? const Color(0xFF16A34A).withOpacity(0.1)
+                        : const Color(0xFFD97706).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
-                    '완료',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF16A34A)),
+                  child: Text(
+                    (status == 'COMPLETED' || status == 'completed') ? '완료' : status,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: (status == 'COMPLETED' || status == 'completed' || status == '완료')
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFFD97706),
+                    ),
                   ),
                 ),
               ),

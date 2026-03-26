@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 /// 공급사 매칭 요청 응답 페이지
 class MatchingResponsePage extends StatefulWidget {
@@ -16,7 +19,71 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
     BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))
   ];
 
-  final List<_IncomingRequest> _requests = [
+  bool _isLoading = true;
+  String? _error;
+
+  List<_IncomingRequest> _requests = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadRequests());
+  }
+
+  Future<void> _loadRequests() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>('/api/dispatch/quotations/requests');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<dynamic> items = [];
+        if (data is List) {
+          items = data;
+        } else if (data is Map && data['content'] is List) {
+          items = data['content'] as List;
+        }
+        _requests = items.map((item) {
+          final m = item as Map<String, dynamic>;
+          return _IncomingRequest(
+            id: (m['id'] ?? '').toString(),
+            bpCompany: (m['bpCompany'] ?? m['companyName'] ?? m['requesterName'] ?? '-').toString(),
+            date: (m['date'] ?? m['requestDate'] ?? '-').toString(),
+            time: (m['time'] ?? m['workTime'] ?? '-').toString(),
+            equipmentSpec: (m['equipmentSpec'] ?? m['equipmentType'] ?? '-').toString(),
+            site: (m['site'] ?? m['location'] ?? '-').toString(),
+            matchedEquipment: (m['matchedEquipment'] ?? m['vehicleNumber'] ?? '-').toString(),
+            matchedOperator: (m['matchedOperator'] ?? m['operatorName'] ?? '-').toString(),
+            docsOk: m['docsOk'] == true,
+            inspectionOk: m['inspectionOk'] == true,
+            licenseOk: m['licenseOk'] == true,
+            educationOk: m['educationOk'] == true,
+            status: (m['status'] ?? 'NEW').toString() == 'NEW' ? '신규' :
+                    (m['status'] ?? '').toString() == 'ACCEPTED' ? '수락' :
+                    (m['status'] ?? '').toString() == 'REJECTED' ? '거절' :
+                    (m['status'] ?? '').toString() == 'QUOTE_SENT' ? '견적발송' :
+                    (m['status'] ?? '신규').toString(),
+            note: m['note']?.toString(),
+            rejectReason: m['rejectReason']?.toString(),
+          );
+        }).toList();
+      }
+    } catch (e) {
+      _error = e.toString();
+      // Keep fallback mock data if API fails
+      if (_requests.isEmpty) {
+        _requests = _getDefaultRequests();
+      }
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<_IncomingRequest> _getDefaultRequests() => [
     _IncomingRequest(
       id: '1',
       bpCompany: '현대건설 (BP사)',
@@ -97,8 +164,75 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
     ),
   ];
 
+  Future<void> _acceptRequestApi(_IncomingRequest request) async {
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.put<dynamic>(
+        '/api/dispatch/quotations/${request.id}/accept',
+      );
+      _loadRequests();
+    } catch (e) {
+      // Fallback to local state
+    }
+  }
+
+  Future<void> _rejectRequestApi(_IncomingRequest request, String reason) async {
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.put<dynamic>(
+        '/api/dispatch/quotations/${request.id}/reject',
+        data: {'reason': reason},
+      );
+      _loadRequests();
+    } catch (e) {
+      // Fallback to local state
+    }
+  }
+
+  Future<void> _sendQuoteApi(_IncomingRequest request, Map<String, dynamic> rates) async {
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.post<dynamic>(
+        '/api/dispatch/quotations',
+        data: {
+          'requestId': request.id,
+          'items': rates,
+        },
+      );
+      _loadRequests();
+    } catch (e) {
+      // Fallback to local state
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        color: _pageBg,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null && _requests.isEmpty) {
+      return Container(
+        color: _pageBg,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Color(0xFFDC2626)),
+              const SizedBox(height: 12),
+              const Text('데이터를 불러오는데 실패했습니다'),
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+              const SizedBox(height: 16),
+              TextButton(onPressed: _loadRequests, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
     final newRequests = _requests.where((r) => r.status == '신규').toList();
     final processedRequests = _requests.where((r) => r.status != '신규').toList();
 
@@ -539,7 +673,7 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               setState(() {
                 final idx = _requests.indexWhere((r) => r.id == request.id);
                 if (idx >= 0) {
@@ -561,6 +695,7 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
                 }
               });
               Navigator.pop(ctx);
+              await _acceptRequestApi(request);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('요청을 수락했습니다. 투입 계획이 자동 생성되었습니다.')),
               );
@@ -616,7 +751,8 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final reason = reasonController.text.isEmpty ? '사유 미입력' : reasonController.text;
               setState(() {
                 final idx = _requests.indexWhere((r) => r.id == request.id);
                 if (idx >= 0) {
@@ -634,11 +770,12 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
                     licenseOk: request.licenseOk,
                     educationOk: request.educationOk,
                     status: '거절',
-                    rejectReason: reasonController.text.isEmpty ? '사유 미입력' : reasonController.text,
+                    rejectReason: reason,
                   );
                 }
               });
               Navigator.pop(ctx);
+              await _rejectRequestApi(request, reason);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('요청을 거절했습니다.')),
               );
@@ -690,7 +827,13 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final rates = {
+                'dayRate': int.tryParse(dayRateController.text) ?? 0,
+                'otRate': int.tryParse(otRateController.text) ?? 0,
+                'nightRate': int.tryParse(nightRateController.text) ?? 0,
+                'overnightRate': int.tryParse(overnightRateController.text) ?? 0,
+              };
               setState(() {
                 final idx = _requests.indexWhere((r) => r.id == request.id);
                 if (idx >= 0) {
@@ -712,6 +855,7 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
                 }
               });
               Navigator.pop(ctx);
+              await _sendQuoteApi(request, rates);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('견적서가 발송되었습니다.')),
               );

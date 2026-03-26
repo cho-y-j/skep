@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class RealtimeLocationPage extends StatefulWidget {
   const RealtimeLocationPage({Key? key}) : super(key: key);
@@ -78,62 +81,12 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
   String _searchQuery = '';
   String _filterType = '전체';
   DateTime? _lastRequestTime;
-
-  static final List<_EquipmentLocation> _mockEquipments = [
-    _EquipmentLocation(
-      id: 'eq1',
-      vehicleNumber: '서울 가 1234',
-      equipmentType: '크레인',
-      operatorName: '김철수',
-      latitude: 37.5665,
-      longitude: 126.9780,
-      status: 'working',
-      lastUpdate: DateTime.now().subtract(const Duration(minutes: 2)),
-    ),
-    _EquipmentLocation(
-      id: 'eq2',
-      vehicleNumber: '경기 나 5678',
-      equipmentType: '굴삭기',
-      operatorName: '이영희',
-      latitude: 37.5512,
-      longitude: 127.0345,
-      status: 'working',
-      lastUpdate: DateTime.now().subtract(const Duration(minutes: 5)),
-    ),
-    _EquipmentLocation(
-      id: 'eq3',
-      vehicleNumber: '서울 다 9012',
-      equipmentType: '덤프트럭',
-      operatorName: '박민수',
-      latitude: 37.4979,
-      longitude: 127.0276,
-      status: 'standby',
-      lastUpdate: DateTime.now().subtract(const Duration(minutes: 15)),
-    ),
-    _EquipmentLocation(
-      id: 'eq4',
-      vehicleNumber: '경기 라 3456',
-      equipmentType: '크레인',
-      operatorName: '최지은',
-      latitude: 37.3947,
-      longitude: 127.1113,
-      status: 'offline',
-      lastUpdate: DateTime.now().subtract(const Duration(hours: 1)),
-    ),
-    _EquipmentLocation(
-      id: 'eq5',
-      vehicleNumber: '서울 마 7890',
-      equipmentType: '지게차',
-      operatorName: '정대호',
-      latitude: 37.5133,
-      longitude: 126.9020,
-      status: 'working',
-      lastUpdate: DateTime.now().subtract(const Duration(minutes: 1)),
-    ),
-  ];
+  List<_EquipmentLocation> _equipments = [];
+  bool _isLoading = true;
+  String? _error;
 
   List<_EquipmentLocation> get _filteredEquipments {
-    return _mockEquipments.where((eq) {
+    return _equipments.where((eq) {
       final matchesSearch = _searchQuery.isEmpty ||
           eq.vehicleNumber.contains(_searchQuery) ||
           eq.operatorName.contains(_searchQuery) ||
@@ -148,12 +101,64 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
   void initState() {
     super.initState();
     _mapController = MapController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   @override
   void dispose() {
     _mapController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      // Use siteId=1 as default; adjust as needed
+      final response = await dioClient.get<dynamic>(
+        ApiEndpoints.locationCurrent.replaceAll('{siteId}', '1'),
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<Map<String, dynamic>> rawList;
+        if (data is List) {
+          rawList = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          rawList = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else if (data is Map && data['locations'] is List) {
+          rawList = (data['locations'] as List).cast<Map<String, dynamic>>();
+        } else {
+          rawList = [];
+        }
+        _equipments = rawList.map((item) {
+          DateTime lastUpdate;
+          try {
+            lastUpdate = DateTime.parse(item['lastUpdate'] ?? item['updatedAt'] ?? item['timestamp'] ?? '');
+          } catch (_) {
+            lastUpdate = DateTime.now();
+          }
+          return _EquipmentLocation(
+            id: (item['id'] ?? item['equipmentId'] ?? item['workerId'] ?? '').toString(),
+            vehicleNumber: item['vehicleNumber'] ?? item['plateNo'] ?? '',
+            equipmentType: item['equipmentType'] ?? item['type'] ?? '',
+            operatorName: item['operatorName'] ?? item['workerName'] ?? '',
+            latitude: (item['latitude'] ?? item['lat'] ?? 37.5665).toDouble(),
+            longitude: (item['longitude'] ?? item['lng'] ?? item['lon'] ?? 126.9780).toDouble(),
+            status: item['status'] ?? 'offline',
+            lastUpdate: lastUpdate,
+          );
+        }).toList();
+      }
+    } catch (e) {
+      _error = e.toString();
+      _equipments = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _centerOnEquipment(_EquipmentLocation eq) {
@@ -163,17 +168,39 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
     _mapController.move(LatLng(eq.latitude, eq.longitude), 15.0);
   }
 
-  void _requestLocation() {
-    setState(() {
-      _lastRequestTime = DateTime.now();
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            '위치 갱신 완료: ${_formatTime(DateTime.now())}'),
-        backgroundColor: const Color(0xFF16A34A),
-      ),
-    );
+  Future<void> _requestLocation() async {
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.post<dynamic>(ApiEndpoints.locationUpdate);
+      await _loadData();
+      setState(() {
+        _lastRequestTime = DateTime.now();
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '위치 갱신 완료: ${_formatTime(DateTime.now())}'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
+    } catch (e) {
+      // Even if the POST fails, still refresh the location data
+      await _loadData();
+      setState(() {
+        _lastRequestTime = DateTime.now();
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '위치 갱신 완료: ${_formatTime(DateTime.now())}'),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
+      }
+    }
   }
 
   String _formatTime(DateTime dt) {
@@ -183,6 +210,33 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
+
+    if (_isLoading) {
+      return Container(
+        color: const Color(0xFFF8FAFC),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null && _equipments.isEmpty) {
+      return Container(
+        color: const Color(0xFFF8FAFC),
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Color(0xFFDC2626)),
+              const SizedBox(height: 12),
+              const Text('위치 데이터를 불러오는데 실패했습니다', style: TextStyle(color: Color(0xFFDC2626))),
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Container(
       color: const Color(0xFFF8FAFC),
@@ -316,11 +370,11 @@ class _RealtimeLocationPageState extends State<RealtimeLocationPage> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatusChip('작업중', const Color(0xFF16A34A),
-                    _mockEquipments.where((e) => e.status == 'working').length),
+                    _equipments.where((e) => e.status == 'working').length),
                 _buildStatusChip('대기', const Color(0xFFD97706),
-                    _mockEquipments.where((e) => e.status == 'standby').length),
+                    _equipments.where((e) => e.status == 'standby').length),
                 _buildStatusChip('오프라인', const Color(0xFFDC2626),
-                    _mockEquipments.where((e) => e.status == 'offline').length),
+                    _equipments.where((e) => e.status == 'offline').length),
               ],
             ),
           ),

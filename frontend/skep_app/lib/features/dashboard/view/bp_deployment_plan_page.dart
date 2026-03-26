@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class BpDeploymentPlanPage extends StatefulWidget {
   const BpDeploymentPlanPage({Key? key}) : super(key: key);
@@ -10,61 +13,90 @@ class BpDeploymentPlanPage extends StatefulWidget {
 }
 
 class _BpDeploymentPlanPageState extends State<BpDeploymentPlanPage> {
-  final List<Map<String, dynamic>> _receivedRequests = [
-    {
-      'supplier': '(주)한국크레인',
-      'equipType': '25톤 크레인',
-      'plateNo': '서울12가3456',
-      'operator': '김운전',
-      'period': '2026-04-01 ~ 2026-06-30',
-      'status': '대기',
-    },
-    {
-      'supplier': '삼성중장비',
-      'equipType': '50톤 크레인',
-      'plateNo': '경기34나5678',
-      'operator': '이기사',
-      'period': '2026-04-15 ~ 2026-07-31',
-      'status': '대기',
-    },
-    {
-      'supplier': '(주)한국크레인',
-      'equipType': '굴삭기 0.7m3',
-      'plateNo': '인천56다7890',
-      'operator': '박기사',
-      'period': '2026-03-01 ~ 2026-05-31',
-      'status': '승인',
-    },
-    {
-      'supplier': '대한건기',
-      'equipType': '지게차 3톤',
-      'plateNo': '부산78라1234',
-      'operator': '최운전',
-      'period': '2026-03-10 ~ 2026-04-30',
-      'status': '반려',
-    },
-  ];
+  List<Map<String, dynamic>> _receivedRequests = [];
+  bool _isLoading = true;
+  String? _error;
 
-  Color _statusColor(String status) {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPlans());
+  }
+
+  Future<void> _loadPlans() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.deploymentPlans);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _receivedRequests = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _receivedRequests = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _receivedRequests = [];
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _receivedRequests = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _translateStatus(String? status) {
+    switch (status) {
+      case 'APPROVED': return '승인';
+      case 'PENDING': return '대기';
+      case 'REJECTED': return '반려';
+      default: return status ?? '-';
+    }
+  }
+
+  Color _statusColor(String? status) {
     switch (status) {
       case '승인':
+      case 'APPROVED':
         return AppColors.success;
       case '대기':
+      case 'PENDING':
         return AppColors.warning;
       case '반려':
+      case 'REJECTED':
         return AppColors.error;
       default:
         return AppColors.grey;
     }
   }
 
-  void _approveRequest(int index) {
-    setState(() {
-      _receivedRequests[index]['status'] = '승인';
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('투입 요청이 승인되었습니다.')),
-    );
+  Future<void> _approveRequest(int index) async {
+    final id = _receivedRequests[index]['id'];
+    try {
+      final dioClient = context.read<DioClient>();
+      if (id != null) {
+        await dioClient.put<dynamic>(
+          ApiEndpoints.deploymentPlan.replaceAll('{id}', id.toString()),
+          data: {'status': 'APPROVED'},
+        );
+      }
+      setState(() {
+        _receivedRequests[index]['status'] = '승인';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('투입 요청이 승인되었습니다.')),
+      );
+      _loadPlans();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('승인 실패: $e'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   void _rejectRequest(int index) {
@@ -87,14 +119,29 @@ class _BpDeploymentPlanPageState extends State<BpDeploymentPlanPage> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              setState(() {
-                _receivedRequests[index]['status'] = '반려';
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('투입 요청이 반려되었습니다.')),
-              );
+              final id = _receivedRequests[index]['id'];
+              try {
+                final dioClient = context.read<DioClient>();
+                if (id != null) {
+                  await dioClient.put<dynamic>(
+                    ApiEndpoints.deploymentPlan.replaceAll('{id}', id.toString()),
+                    data: {'status': 'REJECTED', 'reason': reasonCtrl.text},
+                  );
+                }
+                setState(() {
+                  _receivedRequests[index]['status'] = '반려';
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('투입 요청이 반려되었습니다.')),
+                );
+                _loadPlans();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('반려 실패: $e'), backgroundColor: AppColors.error),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
@@ -163,11 +210,28 @@ class _BpDeploymentPlanPageState extends State<BpDeploymentPlanPage> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('장비 요청이 전송되었습니다.')),
-              );
+              try {
+                final dioClient = context.read<DioClient>();
+                await dioClient.post<dynamic>(
+                  '/api/dispatch/quotations/requests',
+                  data: {
+                    'equipmentType': equipType,
+                    'quantity': qty,
+                    'period': period,
+                    'location': location,
+                  },
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('장비 요청이 전송되었습니다.')),
+                );
+                _loadPlans();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('요청 실패: $e'), backgroundColor: AppColors.error),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
@@ -204,6 +268,17 @@ class _BpDeploymentPlanPageState extends State<BpDeploymentPlanPage> {
                 ),
               ),
               ElevatedButton.icon(
+                onPressed: _loadPlans,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('새로고침'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
                 onPressed: _showEquipmentRequestDialog,
                 icon: const Icon(Icons.add),
                 label: const Text('장비 요청'),
@@ -219,6 +294,42 @@ class _BpDeploymentPlanPageState extends State<BpDeploymentPlanPage> {
           const SizedBox(height: 24),
           Text('수신된 투입 요청', style: AppTextStyles.headlineSmall),
           const SizedBox(height: 12),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(48),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            Padding(
+              padding: const EdgeInsets.all(48),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                    const SizedBox(height: 12),
+                    Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+                    const SizedBox(height: 8),
+                    Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey)),
+                    const SizedBox(height: 16),
+                    TextButton(onPressed: _loadPlans, child: const Text('다시 시도')),
+                  ],
+                ),
+              ),
+            )
+          else if (_receivedRequests.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(48),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.inbox_outlined, size: 48, color: AppColors.grey),
+                    const SizedBox(height: 12),
+                    Text('수신된 투입 요청이 없습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey)),
+                  ],
+                ),
+              ),
+            )
+          else
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -241,28 +352,28 @@ class _BpDeploymentPlanPageState extends State<BpDeploymentPlanPage> {
                 rows: List.generate(_receivedRequests.length, (i) {
                   final r = _receivedRequests[i];
                   return DataRow(cells: [
-                    DataCell(Text(r['supplier'])),
-                    DataCell(Text(r['equipType'])),
-                    DataCell(Text(r['plateNo'])),
-                    DataCell(Text(r['operator'])),
-                    DataCell(Text(r['period'])),
+                    DataCell(Text((r['supplier'] ?? r['supplierName'] ?? r['companyName'] ?? '-').toString())),
+                    DataCell(Text((r['equipType'] ?? r['equipmentType'] ?? r['equipment_type'] ?? '-').toString())),
+                    DataCell(Text((r['plateNo'] ?? r['vehicleNumber'] ?? r['vehicle_number'] ?? '-').toString())),
+                    DataCell(Text((r['operator'] ?? r['operatorName'] ?? '-').toString())),
+                    DataCell(Text((r['period'] ?? '${r['startDate'] ?? '-'} ~ ${r['endDate'] ?? '-'}').toString())),
                     DataCell(Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: _statusColor(r['status']).withOpacity(0.1),
+                        color: _statusColor(r['status']?.toString()).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        r['status'],
+                        _translateStatus(r['status']?.toString()),
                         style: TextStyle(
-                          color: _statusColor(r['status']),
+                          color: _statusColor(r['status']?.toString()),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     )),
-                    DataCell(r['status'] == '대기'
+                    DataCell(r['status'] == '대기' || r['status'] == 'PENDING'
                         ? Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class AdminDeploymentPage extends StatefulWidget {
   const AdminDeploymentPage({Key? key}) : super(key: key);
@@ -10,95 +13,93 @@ class AdminDeploymentPage extends StatefulWidget {
 }
 
 class _AdminDeploymentPageState extends State<AdminDeploymentPage> {
-  String _filterPeriod = '전체';
-  String _filterSupplier = '전체';
-  String _filterBp = '전체';
+  bool _isLoading = true;
+  String? _error;
+
+  List<Map<String, dynamic>> _deployments = [];
+
   String _filterStatus = '전체';
+  final List<String> _statuses = ['전체', 'REQUESTED', 'APPROVED', 'ACTIVE', 'COMPLETED'];
 
-  final List<String> _periods = ['전체', '이번달', '지난달', '최근3개월'];
-  final List<String> _suppliers = ['전체', '(주)한국크레인', '삼성중장비', '대한건기'];
-  final List<String> _bps = ['전체', '현대건설', '삼성물산', 'GS건설'];
-  final List<String> _statuses = ['전체', '요청중', '승인', '진행중', '종료'];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
 
-  final List<Map<String, String>> _deployments = [
-    {
-      'site': '강남 현장 A',
-      'supplier': '(주)한국크레인',
-      'equip': '25톤 크레인',
-      'personnel': '김운전',
-      'bp': '현대건설',
-      'period': '2026-03-01 ~ 2026-06-30',
-      'price': '1,500,000원/일',
-      'status': '진행중',
-    },
-    {
-      'site': '송파 현장 B',
-      'supplier': '삼성중장비',
-      'equip': '굴삭기 0.7m3',
-      'personnel': '박기사',
-      'bp': '현대건설',
-      'period': '2026-03-01 ~ 2026-05-31',
-      'price': '1,200,000원/일',
-      'status': '진행중',
-    },
-    {
-      'site': '일산 현장 D',
-      'supplier': '(주)한국크레인',
-      'equip': '50톤 크레인',
-      'personnel': '이기사',
-      'bp': '삼성물산',
-      'period': '2026-04-01 ~ 2026-07-31',
-      'price': '2,200,000원/일',
-      'status': '승인',
-    },
-    {
-      'site': '용인 현장 F',
-      'supplier': '대한건기',
-      'equip': '지게차 3톤',
-      'personnel': '최운전',
-      'bp': 'GS건설',
-      'period': '2026-02-01 ~ 2026-03-31',
-      'price': '800,000원/일',
-      'status': '종료',
-    },
-    {
-      'site': '판교 현장 E',
-      'supplier': '(주)한국크레인',
-      'equip': '25톤 크레인',
-      'personnel': '김운전',
-      'bp': '삼성물산',
-      'period': '2026-05-01 ~ 2026-08-31',
-      'price': '1,500,000원/일',
-      'status': '요청중',
-    },
-  ];
-
-  Color _statusColor(String status) {
-    switch (status) {
-      case '진행중':
-        return AppColors.success;
-      case '승인':
-        return AppColors.info;
-      case '요청중':
-        return AppColors.warning;
-      case '종료':
-        return AppColors.grey;
-      default:
-        return AppColors.grey;
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.deploymentPlans);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _deployments = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _deployments = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else if (data is Map && data['data'] is List) {
+          _deployments = (data['data'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _deployments = [];
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _deployments = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
 
-  List<Map<String, String>> get _filteredDeployments {
-    return _deployments.where((d) {
-      if (_filterSupplier != '전체' && d['supplier'] != _filterSupplier) {
-        return false;
-      }
-      if (_filterBp != '전체' && d['bp'] != _filterBp) return false;
-      if (_filterStatus != '전체' && d['status'] != _filterStatus) {
-        return false;
-      }
-      return true;
-    }).toList();
+  String _getField(Map<String, dynamic> d, List<String> keys, [String fallback = '-']) {
+    for (final k in keys) {
+      if (d[k] != null) return d[k].toString();
+    }
+    return fallback;
+  }
+
+  String _getStatus(Map<String, dynamic> d) {
+    return _getField(d, ['status', 'planStatus']);
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'REQUESTED': return '요청중';
+      case 'APPROVED': return '승인';
+      case 'ACTIVE': return '진행중';
+      case 'COMPLETED': return '종료';
+      default: return status.isNotEmpty ? status : '-';
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'ACTIVE': return AppColors.success;
+      case 'APPROVED': return AppColors.info;
+      case 'REQUESTED': return AppColors.warning;
+      case 'COMPLETED': return AppColors.grey;
+      default: return AppColors.grey;
+    }
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return '-';
+    try {
+      final dt = DateTime.parse(date.toString());
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return date.toString();
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredDeployments {
+    if (_filterStatus == '전체') return _deployments;
+    return _deployments.where((d) => _getStatus(d) == _filterStatus).toList();
   }
 
   @override
@@ -108,11 +109,32 @@ class _AdminDeploymentPageState extends State<AdminDeploymentPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('투입 관리', style: AppTextStyles.headlineLarge),
-          const SizedBox(height: 4),
-          Text(
-            '전체 투입 현황을 관리합니다.',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('투입 관리', style: AppTextStyles.headlineLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      '전체 투입 현황을 관리합니다.',
+                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('새로고침'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.white,
+                  foregroundColor: AppColors.greyDark,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           // 필터
@@ -128,115 +150,106 @@ class _AdminDeploymentPageState extends State<AdminDeploymentPage> {
               spacing: 16,
               runSpacing: 12,
               children: [
-                _buildFilter('기간', _filterPeriod, _periods,
-                    (v) => setState(() => _filterPeriod = v ?? '전체')),
-                _buildFilter('공급사', _filterSupplier, _suppliers,
-                    (v) => setState(() => _filterSupplier = v ?? '전체')),
-                _buildFilter('BP사', _filterBp, _bps,
-                    (v) => setState(() => _filterBp = v ?? '전체')),
                 _buildFilter('상태', _filterStatus, _statuses,
                     (v) => setState(() => _filterStatus = v ?? '전체')),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          // 매트릭스 요약
-          Text('공급사 x BP사 매트릭스', style: AppTextStyles.headlineSmall),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('공급사 \\ BP사')),
-                  DataColumn(label: Text('현대건설'), numeric: true),
-                  DataColumn(label: Text('삼성물산'), numeric: true),
-                  DataColumn(label: Text('GS건설'), numeric: true),
-                ],
-                rows: const [
-                  DataRow(cells: [
-                    DataCell(Text('(주)한국크레인')),
-                    DataCell(Text('1')),
-                    DataCell(Text('2')),
-                    DataCell(Text('0')),
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text('삼성중장비')),
-                    DataCell(Text('1')),
-                    DataCell(Text('0')),
-                    DataCell(Text('0')),
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text('대한건기')),
-                    DataCell(Text('0')),
-                    DataCell(Text('0')),
-                    DataCell(Text('1')),
-                  ]),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 24),
-          Text('투입 목록', style: AppTextStyles.headlineSmall),
+          Text('투입 목록 (${_filteredDeployments.length}건)', style: AppTextStyles.headlineSmall),
           const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('현장')),
-                  DataColumn(label: Text('공급사')),
-                  DataColumn(label: Text('장비')),
-                  DataColumn(label: Text('인력')),
-                  DataColumn(label: Text('BP사')),
-                  DataColumn(label: Text('기간')),
-                  DataColumn(label: Text('단가')),
-                  DataColumn(label: Text('상태')),
-                ],
-                rows: _filteredDeployments
-                    .map((d) => DataRow(cells: [
-                          DataCell(Text(d['site']!)),
-                          DataCell(Text(d['supplier']!)),
-                          DataCell(Text(d['equip']!)),
-                          DataCell(Text(d['personnel']!)),
-                          DataCell(Text(d['bp']!)),
-                          DataCell(Text(d['period']!)),
-                          DataCell(Text(d['price']!)),
-                          DataCell(Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _statusColor(d['status']!)
-                                  .withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              d['status']!,
-                              style: TextStyle(
-                                color: _statusColor(d['status']!),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          )),
-                        ]))
-                    .toList(),
-              ),
-            ),
-          ),
+          _buildContent(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(48),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline, size: 56, color: Color(0xFFCBD5E1)),
+              const SizedBox(height: 16),
+              const Text('데이터를 불러오는데 실패했습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_filteredDeployments.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.assignment_outlined, size: 56, color: Color(0xFFCBD5E1)),
+              const SizedBox(height: 16),
+              const Text('투입 계획이 없습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: const [
+            DataColumn(label: Text('현장')),
+            DataColumn(label: Text('장비')),
+            DataColumn(label: Text('인력')),
+            DataColumn(label: Text('시작일')),
+            DataColumn(label: Text('종료일')),
+            DataColumn(label: Text('상태')),
+          ],
+          rows: _filteredDeployments.map((d) {
+            final status = _getStatus(d);
+            return DataRow(cells: [
+              DataCell(Text(_getField(d, ['siteName', 'site', 'siteId']))),
+              DataCell(Text(_getField(d, ['equipmentName', 'equipment', 'equipmentId']))),
+              DataCell(Text(_getField(d, ['personnelName', 'personnel', 'personnelId']))),
+              DataCell(Text(_formatDate(d['startDate'] ?? d['start_date']))),
+              DataCell(Text(_formatDate(d['endDate'] ?? d['end_date']))),
+              DataCell(Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _statusColor(status).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _getStatusLabel(status),
+                  style: TextStyle(
+                    color: _statusColor(status),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              )),
+            ]);
+          }).toList(),
+        ),
       ),
     );
   }
@@ -254,7 +267,7 @@ class _AdminDeploymentPageState extends State<AdminDeploymentPage> {
               const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         ),
         items: options
-            .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+            .map((o) => DropdownMenuItem(value: o, child: Text(o == '전체' ? '전체' : _getStatusLabel(o))))
             .toList(),
         onChanged: onChanged,
       ),

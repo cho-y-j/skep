@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 /// BP사 장비 매칭 요청 페이지
 class MatchingRequestPage extends StatefulWidget {
@@ -17,6 +20,11 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   bool _showResults = false;
+  bool _isSearching = false;
+  bool _isLoadingHistory = true;
+  String? _historyError;
+  List<Map<String, dynamic>> _apiResults = [];
+  List<Map<String, dynamic>> _apiHistory = [];
 
   static const _darkText = Color(0xFF1E293B);
   static const _pageBg = Color(0xFFF8FAFC);
@@ -152,10 +160,107 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadHistory());
+  }
+
+  @override
   void dispose() {
     _locationController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() {
+      _isLoadingHistory = true;
+      _historyError = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>('/api/dispatch/quotations/requests');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _apiHistory = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _apiHistory = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _apiHistory = [];
+        }
+      }
+    } catch (e) {
+      _historyError = e.toString();
+      _apiHistory = [];
+    }
+    if (mounted) {
+      setState(() => _isLoadingHistory = false);
+    }
+  }
+
+  Future<void> _doSearch() async {
+    setState(() {
+      _isSearching = true;
+      _showResults = true;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(
+        '/api/dispatch/quotations/requests',
+        queryParameters: {
+          if (_selectedEquipmentType != null) 'equipmentType': _selectedEquipmentType,
+          'date': '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+          if (_locationController.text.isNotEmpty) 'location': _locationController.text,
+        },
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _apiResults = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _apiResults = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _apiResults = [];
+        }
+      }
+    } catch (e) {
+      _apiResults = [];
+    }
+    if (mounted) {
+      setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _sendQuoteRequest(_MatchingResult result) async {
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.post<dynamic>(
+        '/api/dispatch/quotations/requests',
+        data: {
+          'equipmentType': _selectedEquipmentType,
+          'plateNumber': result.plateNumber,
+          'company': result.company,
+          'date': '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+          'startHour': _startHour,
+          'endHour': _endHour,
+          'location': _locationController.text,
+          'note': _noteController.text,
+        },
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('견적 요청이 전송되었습니다.')),
+        );
+        _loadHistory();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('견적 요청 실패: $e'), backgroundColor: const Color(0xFFDC2626)),
+        );
+      }
+    }
   }
 
   @override
@@ -270,11 +375,7 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _showResults = true;
-                });
-              },
+              onPressed: _doSearch,
               icon: const Icon(Icons.search, size: 20),
               label: const Text(
                 '매칭 검색',
@@ -533,6 +634,15 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
   }
 
   Widget _buildMatchingResults() {
+    if (_isSearching) {
+      return const Padding(
+        padding: EdgeInsets.all(48),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Use API results if available, fallback to mock
+    final results = _apiResults.isNotEmpty ? _apiResults : null;
     final available = _mockResults.where((r) => r.status == _MatchStatus.available).toList();
     final conditional = _mockResults.where((r) => r.status == _MatchStatus.conditional).toList();
     final unavailable = _mockResults.where((r) => r.status == _MatchStatus.unavailable).toList();
@@ -714,8 +824,8 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
               runSpacing: 8,
               children: [
                 if (result.status == _MatchStatus.available)
-                  _buildActionButton('투입 요청', AppColors.primary, Icons.send, filled: true),
-                _buildActionButton('견적 요청', const Color(0xFF7C3AED), Icons.request_quote_outlined),
+                  _buildActionButton('투입 요청', AppColors.primary, Icons.send, filled: true, onTap: () => _sendQuoteRequest(result)),
+                _buildActionButton('견적 요청', const Color(0xFF7C3AED), Icons.request_quote_outlined, onTap: () => _sendQuoteRequest(result)),
                 _buildActionButton('상세 보기', const Color(0xFF64748B), Icons.visibility_outlined),
               ],
             ),
@@ -741,10 +851,10 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
     );
   }
 
-  Widget _buildActionButton(String label, Color color, IconData icon, {bool filled = false}) {
+  Widget _buildActionButton(String label, Color color, IconData icon, {bool filled = false, VoidCallback? onTap}) {
     if (filled) {
       return ElevatedButton.icon(
-        onPressed: () {
+        onPressed: onTap ?? () {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('$label 완료'), duration: const Duration(seconds: 1)),
           );
@@ -761,7 +871,7 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
       );
     }
     return OutlinedButton.icon(
-      onPressed: () {
+      onPressed: onTap ?? () {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$label 완료'), duration: const Duration(seconds: 1)),
         );
@@ -816,6 +926,26 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
             ],
           ),
           const SizedBox(height: 20),
+          if (_isLoadingHistory)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_historyError != null)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.error_outline, size: 40, color: Color(0xFFDC2626)),
+                    const SizedBox(height: 8),
+                    Text('이력 로드 실패', style: TextStyle(color: const Color(0xFFDC2626))),
+                    TextButton(onPressed: _loadHistory, child: const Text('다시 시도')),
+                  ],
+                ),
+              ),
+            )
+          else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
@@ -835,7 +965,16 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
                 DataColumn(label: Text('공급사')),
                 DataColumn(label: Text('응답일')),
               ],
-              rows: _mockHistory.map((h) {
+              rows: (_apiHistory.isNotEmpty ? _apiHistory.map((h) {
+                return DataRow(cells: [
+                  DataCell(Text((h['date'] ?? h['requestDate'] ?? h['createdAt'] ?? '-').toString())),
+                  DataCell(Text((h['type'] ?? h['equipmentType'] ?? '-').toString())),
+                  DataCell(Text((h['site'] ?? h['location'] ?? '-').toString())),
+                  DataCell(_buildHistoryStatusBadge((h['status'] ?? '-').toString())),
+                  DataCell(Text((h['supplier'] ?? h['supplierName'] ?? '-').toString())),
+                  DataCell(Text((h['responseDate'] ?? h['updatedAt'] ?? '-').toString())),
+                ]);
+              }).toList() : _mockHistory.map((h) {
                 return DataRow(cells: [
                   DataCell(Text(h.date)),
                   DataCell(Text(h.type)),
@@ -844,7 +983,7 @@ class _MatchingRequestPageState extends State<MatchingRequestPage> {
                   DataCell(Text(h.supplier)),
                   DataCell(Text(h.responseDate)),
                 ]);
-              }).toList(),
+              }).toList()),
             ),
           ),
         ],

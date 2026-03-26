@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class AdminDocumentManagementPage extends StatefulWidget {
   const AdminDocumentManagementPage({Key? key}) : super(key: key);
@@ -22,24 +25,140 @@ class _AdminDocumentManagementPageState
   int? _sortColumnIndex;
   bool _sortAscending = true;
 
-  final List<String> _expiryOptions = ['전체', 'D-7 이내', 'D-14 이내', 'D-30 이내', '만료'];
-  final List<String> _docTypes = ['전체', '건설기계등록증', '보험증권', '정기검사증', '면허증', '건강검진결과', '안전교육수료증'];
-  final List<String> _suppliers = ['전체', '(주)한국크레인', '삼성중장비', '대한건기'];
+  // API data
+  List<Map<String, dynamic>> _documents = [];
+  List<String> _docTypes = ['전체'];
+  bool _isLoading = true;
+  String? _error;
 
-  final List<Map<String, dynamic>> _documents = [
-    {'docName': '건설기계등록증', 'owner': '25톤 크레인 (서울12가3456)', 'ownerType': '장비', 'supplier': '(주)한국크레인', 'expiryDate': '2026-04-05', 'dDay': 14, 'status': '만료임박'},
-    {'docName': '보험증권', 'owner': '50톤 크레인 (경기34나5678)', 'ownerType': '장비', 'supplier': '(주)한국크레인', 'expiryDate': '2026-03-30', 'dDay': 8, 'status': '만료임박'},
-    {'docName': '정기검사증', 'owner': '굴삭기 0.7m3 (인천56다7890)', 'ownerType': '장비', 'supplier': '삼성중장비', 'expiryDate': '2026-04-15', 'dDay': 24, 'status': '만료임박'},
-    {'docName': '건강검진결과', 'owner': '김운전', 'ownerType': '인력', 'supplier': '(주)한국크레인', 'expiryDate': '2026-03-25', 'dDay': 3, 'status': '만료임박'},
-    {'docName': '안전교육수료증', 'owner': '이기사', 'ownerType': '인력', 'supplier': '(주)한국크레인', 'expiryDate': '2026-03-20', 'dDay': -2, 'status': '만료'},
-    {'docName': '면허증', 'owner': '박기사', 'ownerType': '인력', 'supplier': '삼성중장비', 'expiryDate': '2026-04-20', 'dDay': 29, 'status': '만료임박'},
-    {'docName': '보험증권', 'owner': '지게차 3톤 (부산78라1234)', 'ownerType': '장비', 'supplier': '대한건기', 'expiryDate': '2026-03-18', 'dDay': -4, 'status': '만료'},
-  ];
+  final List<String> _expiryOptions = ['전체', 'D-7 이내', 'D-14 이내', 'D-30 이내', '만료'];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+      _loadDocTypes();
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.documentExpiring);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _documents = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['documents'] is List) {
+          _documents = (data['documents'] as List).cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _documents = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _documents = [];
+        }
+        // Compute dDay and status for each document
+        final now = DateTime.now();
+        for (var doc in _documents) {
+          final expiryStr = doc['expiryDate']?.toString() ?? doc['expiry_date']?.toString() ?? doc['expirationDate']?.toString();
+          if (expiryStr != null) {
+            try {
+              final expiry = DateTime.parse(expiryStr);
+              final diff = expiry.difference(now).inDays;
+              doc['_dDay'] = diff;
+              doc['_status'] = diff < 0 ? '만료' : '만료임박';
+              doc['_expiryDate'] = expiryStr;
+            } catch (_) {
+              doc['_dDay'] = 999;
+              doc['_status'] = '-';
+              doc['_expiryDate'] = expiryStr;
+            }
+          } else {
+            doc['_dDay'] = 999;
+            doc['_status'] = '-';
+            doc['_expiryDate'] = '-';
+          }
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _documents = [];
+    }
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadDocTypes() async {
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.documentTypes);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<String> types = ['전체'];
+        if (data is List) {
+          for (var item in data) {
+            if (item is String) {
+              types.add(item);
+            } else if (item is Map) {
+              types.add(item['name']?.toString() ?? item['typeName']?.toString() ?? '');
+            }
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _docTypes = types;
+          });
+        }
+      }
+    } catch (_) {
+      // Keep default doc types
+    }
+  }
+
+  String _getDocName(Map<String, dynamic> d) {
+    return d['docName']?.toString() ?? d['documentName']?.toString() ?? d['document_name']?.toString() ?? d['typeName']?.toString() ?? d['type']?.toString() ?? '-';
+  }
+
+  String _getOwner(Map<String, dynamic> d) {
+    return d['owner']?.toString() ?? d['ownerName']?.toString() ?? d['owner_name']?.toString() ?? '-';
+  }
+
+  String _getOwnerType(Map<String, dynamic> d) {
+    final type = d['ownerType']?.toString() ?? d['owner_type']?.toString() ?? '';
+    switch (type) {
+      case 'EQUIPMENT': return '장비';
+      case 'PERSON': return '인력';
+      default: return type.isNotEmpty ? type : '-';
+    }
+  }
+
+  String _getSupplier(Map<String, dynamic> d) {
+    return d['supplier']?.toString() ?? d['companyName']?.toString() ?? d['company_name']?.toString() ?? '-';
+  }
+
+  int _getDDay(Map<String, dynamic> d) {
+    return d['_dDay'] as int? ?? d['dDay'] as int? ?? 999;
+  }
+
+  String _getExpiryDate(Map<String, dynamic> d) {
+    return _formatDate(d['_expiryDate'] ?? d['expiryDate'] ?? d['expiry_date'] ?? d['expirationDate']);
+  }
+
+  String _getStatus(Map<String, dynamic> d) {
+    return d['_status']?.toString() ?? d['status']?.toString() ?? '-';
   }
 
   Color _dDayColor(int dDay) {
@@ -57,10 +176,13 @@ class _AdminDocumentManagementPageState
 
   List<Map<String, dynamic>> get _filtered {
     var list = _documents.where((d) {
-      if (_filterSupplier != '전체' && d['supplier'] != _filterSupplier) return false;
-      if (_filterDocType != '전체' && d['docName'] != _filterDocType) return false;
+      final supplier = _getSupplier(d);
+      final docName = _getDocName(d);
+      final dDay = _getDDay(d);
+
+      if (_filterSupplier != '전체' && supplier != _filterSupplier) return false;
+      if (_filterDocType != '전체' && docName != _filterDocType) return false;
       if (_filterExpiry != '전체') {
-        final dDay = d['dDay'] as int;
         switch (_filterExpiry) {
           case 'D-7 이내': if (dDay > 7) return false; break;
           case 'D-14 이내': if (dDay > 14) return false; break;
@@ -74,8 +196,9 @@ class _AdminDocumentManagementPageState
     // 상태 칩 필터
     if (_statusChipFilter != '전체') {
       list = list.where((d) {
-        if (_statusChipFilter == '만료') return (d['dDay'] as int) < 0;
-        if (_statusChipFilter == '만료임박') return (d['dDay'] as int) >= 0;
+        final dDay = _getDDay(d);
+        if (_statusChipFilter == '만료') return dDay < 0;
+        if (_statusChipFilter == '만료임박') return dDay >= 0;
         return true;
       }).toList();
     }
@@ -84,9 +207,9 @@ class _AdminDocumentManagementPageState
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       list = list.where((d) {
-        return (d['docName'] as String).toLowerCase().contains(query) ||
-            (d['owner'] as String).toLowerCase().contains(query) ||
-            (d['supplier'] as String).toLowerCase().contains(query);
+        return _getDocName(d).toLowerCase().contains(query) ||
+            _getOwner(d).toLowerCase().contains(query) ||
+            _getSupplier(d).toLowerCase().contains(query);
       }).toList();
     }
 
@@ -96,12 +219,12 @@ class _AdminDocumentManagementPageState
       list.sort((a, b) {
         int result;
         switch (_sortColumnIndex) {
-          case 0: result = (a['docName'] as String).compareTo(b['docName'] as String); break;
-          case 1: result = (a['owner'] as String).compareTo(b['owner'] as String); break;
-          case 2: result = (a['ownerType'] as String).compareTo(b['ownerType'] as String); break;
-          case 3: result = (a['supplier'] as String).compareTo(b['supplier'] as String); break;
-          case 4: result = (a['expiryDate'] as String).compareTo(b['expiryDate'] as String); break;
-          case 5: result = (a['dDay'] as int).compareTo(b['dDay'] as int); break;
+          case 0: result = _getDocName(a).compareTo(_getDocName(b)); break;
+          case 1: result = _getOwner(a).compareTo(_getOwner(b)); break;
+          case 2: result = _getOwnerType(a).compareTo(_getOwnerType(b)); break;
+          case 3: result = _getSupplier(a).compareTo(_getSupplier(b)); break;
+          case 4: result = _getExpiryDate(a).compareTo(_getExpiryDate(b)); break;
+          case 5: result = _getDDay(a).compareTo(_getDDay(b)); break;
           default: result = 0;
         }
         return _sortAscending ? result : -result;
@@ -109,6 +232,16 @@ class _AdminDocumentManagementPageState
     }
 
     return list;
+  }
+
+  // Build unique supplier list from loaded data
+  List<String> get _suppliers {
+    final supplierSet = <String>{'전체'};
+    for (var d in _documents) {
+      final s = _getSupplier(d);
+      if (s != '-') supplierSet.add(s);
+    }
+    return supplierSet.toList();
   }
 
   void _onSort(int columnIndex, bool ascending) {
@@ -126,9 +259,30 @@ class _AdminDocumentManagementPageState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('서류 관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-          const SizedBox(height: 4),
-          Text('만료 임박 서류를 확인하고 관리합니다. (D-30 이내)', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('서류 관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+                    const SizedBox(height: 4),
+                    Text('만료 임박 서류를 확인하고 관리합니다. (D-30 이내)', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('새로고침'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.white,
+                  foregroundColor: AppColors.greyDark,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           // 검색 & 필터
           Container(
@@ -193,10 +347,6 @@ class _AdminDocumentManagementPageState
             ),
           ),
           const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text('총 ${filteredDocs.length}건', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-          ),
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -205,71 +355,133 @@ class _AdminDocumentManagementPageState
               border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
             ),
-            child: filteredDocs.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(48),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          const Icon(Icons.search_off, size: 56, color: Color(0xFFCBD5E1)),
-                          const SizedBox(height: 16),
-                          const Text('검색 결과가 없습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
-                          const SizedBox(height: 8),
-                          Text('다른 검색어나 필터를 시도해 주세요.', style: TextStyle(fontSize: 13, color: const Color(0xFFCBD5E1))),
-                        ],
-                      ),
-                    ),
-                  )
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      sortColumnIndex: _sortColumnIndex,
-                      sortAscending: _sortAscending,
-                      headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
-                      headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-                      dataTextStyle: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-                      columns: [
-                        DataColumn(label: const Text('서류명'), onSort: _onSort),
-                        DataColumn(label: const Text('소속'), onSort: _onSort),
-                        DataColumn(label: const Text('구분'), onSort: _onSort),
-                        DataColumn(label: const Text('공급사'), onSort: _onSort),
-                        DataColumn(label: const Text('만료일'), onSort: _onSort),
-                        DataColumn(label: const Text('D-Day'), onSort: _onSort),
-                        const DataColumn(label: Text('상태')),
-                      ],
-                      rows: filteredDocs.map((d) => DataRow(cells: [
-                        DataCell(Text(d['docName'])),
-                        DataCell(Text(d['owner'])),
-                        DataCell(Text(d['ownerType'])),
-                        DataCell(Text(d['supplier'])),
-                        DataCell(Text(d['expiryDate'])),
-                        DataCell(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(color: _dDayColor(d['dDay']).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                          child: Text(_dDayText(d['dDay']), style: TextStyle(color: _dDayColor(d['dDay']), fontSize: 12, fontWeight: FontWeight.bold)),
-                        )),
-                        DataCell(Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: (d['dDay'] as int) < 0 ? AppColors.error.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(d['status'], style: TextStyle(color: (d['dDay'] as int) < 0 ? AppColors.error : AppColors.warning, fontSize: 12, fontWeight: FontWeight.w600)),
-                        )),
-                      ])).toList(),
-                    ),
-                  ),
+            child: _buildContent(filteredDocs),
           ),
         ],
       ),
     );
   }
 
+  Widget _buildContent(List<Map<String, dynamic>> filteredDocs) {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(48),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline, size: 56, color: Color(0xFFCBD5E1)),
+              const SizedBox(height: 16),
+              const Text('데이터를 불러오는데 실패했습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_documents.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.description_outlined, size: 56, color: Color(0xFFCBD5E1)),
+              const SizedBox(height: 16),
+              const Text('만료 임박 서류가 없습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (filteredDocs.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(Icons.search_off, size: 56, color: Color(0xFFCBD5E1)),
+              const SizedBox(height: 16),
+              const Text('검색 결과가 없습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+              const SizedBox(height: 8),
+              Text('다른 검색어나 필터를 시도해 주세요.', style: TextStyle(fontSize: 13, color: const Color(0xFFCBD5E1))),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Text('총 ${filteredDocs.length}건', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            sortColumnIndex: _sortColumnIndex,
+            sortAscending: _sortAscending,
+            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+            headingTextStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+            dataTextStyle: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+            columns: [
+              DataColumn(label: const Text('서류명'), onSort: _onSort),
+              DataColumn(label: const Text('소속'), onSort: _onSort),
+              DataColumn(label: const Text('구분'), onSort: _onSort),
+              DataColumn(label: const Text('공급사'), onSort: _onSort),
+              DataColumn(label: const Text('만료일'), onSort: _onSort),
+              DataColumn(label: const Text('D-Day'), onSort: _onSort),
+              const DataColumn(label: Text('상태')),
+            ],
+            rows: filteredDocs.map((d) {
+              final dDay = _getDDay(d);
+              final status = _getStatus(d);
+              return DataRow(cells: [
+                DataCell(Text(_getDocName(d))),
+                DataCell(Text(_getOwner(d))),
+                DataCell(Text(_getOwnerType(d))),
+                DataCell(Text(_getSupplier(d))),
+                DataCell(Text(_getExpiryDate(d))),
+                DataCell(Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: _dDayColor(dDay).withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                  child: Text(_dDayText(dDay), style: TextStyle(color: _dDayColor(dDay), fontSize: 12, fontWeight: FontWeight.bold)),
+                )),
+                DataCell(Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: dDay < 0 ? AppColors.error.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(status, style: TextStyle(color: dDay < 0 ? AppColors.error : AppColors.warning, fontSize: 12, fontWeight: FontWeight.w600)),
+                )),
+              ]);
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildFilter(String label, String value, List<String> options, ValueChanged<String?> onChanged) {
+    // Ensure current value is in options, otherwise reset to '전체'
+    final safeValue = options.contains(value) ? value : '전체';
     return SizedBox(
       width: 180,
       child: DropdownButtonFormField<String>(
-        value: value,
+        value: safeValue,
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -279,5 +491,15 @@ class _AdminDocumentManagementPageState
         onChanged: onChanged,
       ),
     );
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return '-';
+    try {
+      final dt = DateTime.parse(date.toString());
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return date.toString();
+    }
   }
 }

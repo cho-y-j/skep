@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class BpSettlementPage extends StatefulWidget {
   const BpSettlementPage({Key? key}) : super(key: key);
@@ -11,49 +14,73 @@ class BpSettlementPage extends StatefulWidget {
 
 class _BpSettlementPageState extends State<BpSettlementPage> {
   int? _expandedSupplierIndex;
+  List<Map<String, dynamic>> _supplierSettlements = [];
+  bool _isLoading = true;
+  String? _error;
 
-  final List<Map<String, dynamic>> _supplierSettlements = [
-    {
-      'supplier': '(주)한국크레인',
-      'equipCount': 2,
-      'days': 45,
-      'amount': 67500000,
-      'tax': 6750000,
-      'total': 74250000,
-      'payStatus': '지급완료',
-      'daily': [
-        {'date': '2026-03-01', 'equip': '25톤 크레인', 'day': 8, 'ot': 2, 'night': 0, 'allNight': 0, 'amount': 1500000},
-        {'date': '2026-03-02', 'equip': '25톤 크레인', 'day': 8, 'ot': 0, 'night': 4, 'allNight': 0, 'amount': 1800000},
-        {'date': '2026-03-03', 'equip': '50톤 크레인', 'day': 8, 'ot': 3, 'night': 0, 'allNight': 0, 'amount': 2200000},
-        {'date': '2026-03-04', 'equip': '25톤 크레인', 'day': 8, 'ot': 0, 'night': 0, 'allNight': 12, 'amount': 2500000},
-      ],
-    },
-    {
-      'supplier': '삼성중장비',
-      'equipCount': 1,
-      'days': 20,
-      'amount': 30000000,
-      'tax': 3000000,
-      'total': 33000000,
-      'payStatus': '미지급',
-      'daily': [
-        {'date': '2026-03-01', 'equip': '굴삭기 0.7m3', 'day': 8, 'ot': 1, 'night': 0, 'allNight': 0, 'amount': 1200000},
-        {'date': '2026-03-02', 'equip': '굴삭기 0.7m3', 'day': 8, 'ot': 0, 'night': 0, 'allNight': 0, 'amount': 1000000},
-      ],
-    },
-    {
-      'supplier': '대한건기',
-      'equipCount': 1,
-      'days': 15,
-      'amount': 15000000,
-      'tax': 1500000,
-      'total': 16500000,
-      'payStatus': '지급중',
-      'daily': [
-        {'date': '2026-03-01', 'equip': '지게차 3톤', 'day': 8, 'ot': 0, 'night': 0, 'allNight': 0, 'amount': 800000},
-      ],
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.settlements);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _supplierSettlements = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _supplierSettlements = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _supplierSettlements = [];
+        }
+        // Normalize field names from API
+        _supplierSettlements = _supplierSettlements.map((s) {
+          return {
+            'id': s['id'],
+            'supplier': s['supplier'] ?? s['supplierName'] ?? s['companyName'] ?? '',
+            'equipCount': s['equipCount'] ?? s['equipmentCount'] ?? 0,
+            'days': s['days'] ?? s['workDays'] ?? s['totalDays'] ?? 0,
+            'amount': s['amount'] ?? s['baseAmount'] ?? 0,
+            'tax': s['tax'] ?? s['taxAmount'] ?? 0,
+            'total': s['total'] ?? s['totalAmount'] ?? 0,
+            'payStatus': _mapPayStatus(s['payStatus'] ?? s['status'] ?? ''),
+            'daily': s['daily'] ?? s['dailyRecords'] ?? s['details'] ?? [],
+          };
+        }).toList();
+      }
+    } catch (e) {
+      _error = e.toString();
+      _supplierSettlements = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _mapPayStatus(dynamic status) {
+    final s = status?.toString().toUpperCase() ?? '';
+    switch (s) {
+      case 'PAID':
+      case 'COMPLETED':
+        return '지급완료';
+      case 'UNPAID':
+      case 'PENDING':
+        return '미지급';
+      case 'IN_PROGRESS':
+      case 'PROCESSING':
+        return '지급중';
+      default:
+        return status?.toString() ?? '';
+    }
+  }
 
   String _formatMoney(num amount) {
     final str = amount.toString();
@@ -84,11 +111,37 @@ class _BpSettlementPageState extends State<BpSettlementPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(48),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Container(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: 12),
+              Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+              const SizedBox(height: 8),
+              Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
+
     final totalAmount = _supplierSettlements.fold<num>(
-        0, (sum, s) => sum + (s['total'] as num));
+        0, (sum, s) => sum + ((s['total'] ?? 0) as num));
     final paidAmount = _supplierSettlements
         .where((s) => s['payStatus'] == '지급완료')
-        .fold<num>(0, (sum, s) => sum + (s['total'] as num));
+        .fold<num>(0, (sum, s) => sum + ((s['total'] ?? 0) as num));
     final unpaidAmount = totalAmount - paidAmount;
 
     return SingleChildScrollView(

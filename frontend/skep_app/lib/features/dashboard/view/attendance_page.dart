@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({Key? key}) : super(key: key);
@@ -73,6 +76,9 @@ class _AttendanceRecord {
 
 class _AttendancePageState extends State<AttendancePage> {
   late DateTime _selectedDate;
+  bool _isLoading = true;
+  String? _error;
+  List<Map<String, dynamic>> _apiRecords = [];
 
   // 검색 & 필터 & 정렬
   final TextEditingController _searchController = TextEditingController();
@@ -85,6 +91,7 @@ class _AttendancePageState extends State<AttendancePage> {
   void initState() {
     super.initState();
     _selectedDate = DateTime.now();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAttendance());
   }
 
   @override
@@ -93,7 +100,71 @@ class _AttendancePageState extends State<AttendancePage> {
     super.dispose();
   }
 
+  Future<void> _loadAttendance() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+      final response = await dioClient.get<dynamic>(
+        ApiEndpoints.workRecords,
+        queryParameters: {'date': dateStr},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _apiRecords = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _apiRecords = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _apiRecords = [];
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _apiRecords = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _clockIn() async {
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.post<dynamic>(ApiEndpoints.clockIn);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('출근이 기록되었습니다.'), backgroundColor: Color(0xFF16A34A)),
+        );
+        _loadAttendance();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('출근 기록 실패: $e'), backgroundColor: const Color(0xFFDC2626)),
+        );
+      }
+    }
+  }
+
   List<_AttendanceRecord> get _records {
+    // If API returned data, convert it
+    if (_apiRecords.isNotEmpty) {
+      return _apiRecords.map((r) {
+        return _AttendanceRecord(
+          name: (r['name'] ?? r['workerName'] ?? r['operatorName'] ?? '-').toString(),
+          equipment: (r['equipment'] ?? r['equipmentName'] ?? '-').toString(),
+          checkIn: _parseDateTime(r['checkIn'] ?? r['clockInTime']),
+          workStart: _parseDateTime(r['workStart'] ?? r['startTime']),
+          workEnd: _parseDateTime(r['workEnd'] ?? r['endTime']),
+          gpsCoord: (r['gpsCoord'] ?? r['location'] ?? '-').toString(),
+        );
+      }).toList();
+    }
+    // Fallback to hardcoded data
     final d = _selectedDate;
     return [
       _AttendanceRecord(name: '김철수', equipment: '25톤 크레인 (서울 가 1234)', checkIn: DateTime(d.year, d.month, d.day, 6, 45), workStart: DateTime(d.year, d.month, d.day, 7, 0), workEnd: DateTime(d.year, d.month, d.day, 17, 30), gpsCoord: '37.5665, 126.9780'),
@@ -103,6 +174,15 @@ class _AttendancePageState extends State<AttendancePage> {
       _AttendanceRecord(name: '정대호', equipment: '지게차 (서울 마 7890)', checkIn: null, workStart: null, workEnd: null, gpsCoord: '-'),
       _AttendanceRecord(name: '강기사', equipment: '25톤 크레인 (경기 바 2345)', checkIn: DateTime(d.year, d.month, d.day, 21, 30), workStart: DateTime(d.year, d.month, d.day, 22, 0), workEnd: null, gpsCoord: '37.4020, 126.9530'),
     ];
+  }
+
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
   }
 
   List<_AttendanceRecord> get _filteredRecords {
@@ -169,14 +249,41 @@ class _AttendancePageState extends State<AttendancePage> {
                 const SizedBox(width: 8),
                 Text(DateFormat('yyyy년 MM월 dd일 (E)', 'ko').format(_selectedDate), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
                 const SizedBox(width: 8),
-                IconButton(icon: const Icon(Icons.chevron_left, size: 24), onPressed: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1)))),
-                IconButton(icon: const Icon(Icons.chevron_right, size: 24), onPressed: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1)))),
+                IconButton(icon: const Icon(Icons.chevron_left, size: 24), onPressed: () { setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))); _loadAttendance(); }),
+                IconButton(icon: const Icon(Icons.chevron_right, size: 24), onPressed: () { setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1))); _loadAttendance(); }),
                 TextButton(
                   onPressed: () async {
                     final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime(2024), lastDate: DateTime(2030));
-                    if (picked != null) setState(() => _selectedDate = picked);
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                      _loadAttendance();
+                    }
                   },
                   child: const Text('날짜 선택', style: TextStyle(fontSize: 13)),
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: _clockIn,
+                  icon: const Icon(Icons.login, size: 18),
+                  label: const Text('출근'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _loadAttendance,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('새로고침'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2196F3),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
               ],
             ),
@@ -275,6 +382,12 @@ class _AttendancePageState extends State<AttendancePage> {
               ),
             ),
             const SizedBox(height: 16),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
             // 결과 카운트
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -337,6 +450,7 @@ class _AttendancePageState extends State<AttendancePage> {
                 ),
               ),
             ),
+            ], // end of _isLoading else
           ],
         ),
       ),

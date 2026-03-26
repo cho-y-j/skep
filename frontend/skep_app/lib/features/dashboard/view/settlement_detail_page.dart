@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class SettlementDetailPage extends StatefulWidget {
   const SettlementDetailPage({Key? key}) : super(key: key);
@@ -12,6 +15,9 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   String _selectedBP = '강남 건설 BP';
   final _numberFormat = NumberFormat('#,###');
+  bool _isLoading = true;
+  String? _error;
+  Map<String, dynamic>? _apiSettlement;
 
   final List<String> _bpList = [
     '강남 건설 BP',
@@ -19,14 +25,73 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
     '성남 건설 BP',
   ];
 
-  // 단가
-  static const int _dayRate = 850000;
-  static const int _dayOTRate = 120000;
-  static const int _nightRate = 1100000;
-  static const int _nightOTRate = 150000;
-  static const int _dutyRate = 30000;
+  // 단가 (can be overridden by API)
+  int _dayRate = 850000;
+  int _dayOTRate = 120000;
+  int _nightRate = 1100000;
+  int _nightOTRate = 150000;
+  int _dutyRate = 30000;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettlement());
+  }
+
+  Future<void> _loadSettlement() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final monthStr = '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
+      final response = await dioClient.get<dynamic>(
+        ApiEndpoints.settlements,
+        queryParameters: {
+          'month': monthStr,
+          'bp': _selectedBP,
+        },
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          _apiSettlement = data;
+          // Update rates from API if available
+          if (data['dayRate'] != null) _dayRate = (data['dayRate'] as num).toInt();
+          if (data['dayOTRate'] != null) _dayOTRate = (data['dayOTRate'] as num).toInt();
+          if (data['nightRate'] != null) _nightRate = (data['nightRate'] as num).toInt();
+          if (data['nightOTRate'] != null) _nightOTRate = (data['nightOTRate'] as num).toInt();
+          if (data['dutyRate'] != null) _dutyRate = (data['dutyRate'] as num).toInt();
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _apiSettlement = null;
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   List<_DailySettlement> get _data {
+    // Use API data if available
+    if (_apiSettlement != null && _apiSettlement!['dailyData'] is List) {
+      return (_apiSettlement!['dailyData'] as List).map((item) {
+        final m = item as Map<String, dynamic>;
+        return _DailySettlement(
+          day: (m['day'] as num?)?.toInt() ?? 0,
+          isWeekend: m['isWeekend'] == true,
+          dayWork: (m['dayWork'] as num?)?.toInt() ?? 0,
+          dayOT: (m['dayOT'] as num?)?.toInt() ?? 0,
+          nightWork: (m['nightWork'] as num?)?.toInt() ?? 0,
+          nightOT: (m['nightOT'] as num?)?.toInt() ?? 0,
+          duty: (m['duty'] as num?)?.toInt() ?? 0,
+          rest: (m['rest'] as num?)?.toInt() ?? 0,
+        );
+      }).toList();
+    }
+    // Fallback to generated mock data
     final daysInMonth = DateUtils.getDaysInMonth(_selectedMonth.year, _selectedMonth.month);
     return List.generate(daysInMonth, (i) {
       final day = i + 1;
@@ -35,7 +100,6 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
       if (isWeekend) {
         return _DailySettlement(day: day, isWeekend: true);
       }
-      // Mock data
       return _DailySettlement(
         day: day,
         isWeekend: false,
@@ -85,9 +149,12 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.chevron_left, size: 20),
-                      onPressed: () => setState(() {
-                        _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
-                      }),
+                      onPressed: () {
+                        setState(() {
+                          _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+                        });
+                        _loadSettlement();
+                      },
                     ),
                     Text(
                       DateFormat('yyyy년 MM월').format(_selectedMonth),
@@ -95,9 +162,12 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.chevron_right, size: 20),
-                      onPressed: () => setState(() {
-                        _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
-                      }),
+                      onPressed: () {
+                        setState(() {
+                          _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+                        });
+                        _loadSettlement();
+                      },
                     ),
                   ],
                 ),
@@ -118,7 +188,10 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
                     ),
                     style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
                     items: _bpList.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-                    onChanged: (v) => setState(() => _selectedBP = v ?? _selectedBP),
+                    onChanged: (v) {
+                      setState(() => _selectedBP = v ?? _selectedBP);
+                      _loadSettlement();
+                    },
                   ),
                 ),
                 // PDF / 이메일
@@ -149,6 +222,28 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
               ],
             ),
             const SizedBox(height: 20),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(48),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null && _apiSettlement == null)
+              Padding(
+                padding: const EdgeInsets.all(48),
+                child: Center(
+                  child: Column(
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Color(0xFFDC2626)),
+                      const SizedBox(height: 12),
+                      const Text('데이터를 불러오는데 실패했습니다'),
+                      const SizedBox(height: 8),
+                      Text(_error!, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                      const SizedBox(height: 16),
+                      TextButton(onPressed: _loadSettlement, child: const Text('다시 시도')),
+                    ],
+                  ),
+                ),
+              ),
             // 거래명세서 헤더
             Container(
               width: double.infinity,

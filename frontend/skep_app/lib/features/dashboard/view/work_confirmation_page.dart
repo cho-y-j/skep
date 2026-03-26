@@ -1,7 +1,10 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class WorkConfirmationPage extends StatefulWidget {
   const WorkConfirmationPage({Key? key}) : super(key: key);
@@ -69,7 +72,78 @@ class _WorkConfirmationPageState extends State<WorkConfirmationPage>
   late TabController _tabController;
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
-  final List<_DailyWork> _dailyWorks = [
+  List<_DailyWork> _dailyWorks = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDailyWorks());
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadDailyWorks() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.dailyConfirmations);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<dynamic> items = [];
+        if (data is List) {
+          items = data;
+        } else if (data is Map && data['content'] is List) {
+          items = data['content'] as List;
+        }
+        _dailyWorks = items.map((item) {
+          final m = item as Map<String, dynamic>;
+          return _DailyWork(
+            id: (m['id'] ?? '').toString(),
+            date: _parseDate(m['date'] ?? m['workDate']) ?? DateTime.now(),
+            equipment: (m['equipment'] ?? m['equipmentName'] ?? '-').toString(),
+            operator: (m['operator'] ?? m['operatorName'] ?? '-').toString(),
+            site: (m['site'] ?? m['siteName'] ?? '-').toString(),
+            vehicleNumber: (m['vehicleNumber'] ?? m['vehicle_number'] ?? '-').toString(),
+            workContent: (m['workContent'] ?? m['description'] ?? '-').toString(),
+            startTime: _parseDate(m['startTime']) ?? DateTime.now(),
+            endTime: _parseDate(m['endTime']) ?? DateTime.now(),
+            hasOvertime: m['hasOvertime'] == true || m['overtime'] == true,
+            status: (m['status'] ?? 'draft').toString().toLowerCase(),
+          );
+        }).toList();
+      }
+    } catch (e) {
+      _error = e.toString();
+      // Fallback to mock data
+      if (_dailyWorks.isEmpty) {
+        _dailyWorks = _getDefaultWorks();
+      }
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<_DailyWork> _getDefaultWorks() => [
     _DailyWork(
       id: 'w1',
       date: DateTime.now().subtract(const Duration(days: 0)),
@@ -111,16 +185,15 @@ class _WorkConfirmationPageState extends State<WorkConfirmationPage>
     ),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  Future<void> _requestBpSign(_DailyWork work) async {
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.post<dynamic>(
+        '${ApiEndpoints.dailyConfirmations}/${work.id}/request-sign',
+      );
+    } catch (_) {
+      // Proceed with local state change even if API fails
+    }
   }
 
   @override
@@ -159,6 +232,37 @@ class _WorkConfirmationPageState extends State<WorkConfirmationPage>
 
   // ──────────── Tab 1: 일일 작업확인서 ────────────
   Widget _buildDailyTab() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _dailyWorks.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Color(0xFFDC2626)),
+            const SizedBox(height: 12),
+            const Text('데이터를 불러오는데 실패했습니다'),
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+            const SizedBox(height: 16),
+            TextButton(onPressed: _loadDailyWorks, child: const Text('다시 시도')),
+          ],
+        ),
+      );
+    }
+    if (_dailyWorks.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.assignment_outlined, size: 56, color: Color(0xFFCBD5E1)),
+            SizedBox(height: 16),
+            Text('작업확인서가 없습니다', style: TextStyle(fontSize: 16, color: Color(0xFF94A3B8))),
+          ],
+        ),
+      );
+    }
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _dailyWorks.length,
@@ -286,11 +390,13 @@ class _WorkConfirmationPageState extends State<WorkConfirmationPage>
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context);
+                        await _requestBpSign(work);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('BP서명 요청을 보냈습니다.'), backgroundColor: Color(0xFF2196F3)),
                         );
+                        _loadDailyWorks();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2196F3),

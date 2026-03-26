@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class SupplierDeploymentPage extends StatefulWidget {
   const SupplierDeploymentPage({Key? key}) : super(key: key);
@@ -10,72 +13,86 @@ class SupplierDeploymentPage extends StatefulWidget {
 }
 
 class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
-  final List<Map<String, dynamic>> _deployments = [
-    {
-      'site': '강남 현장 A',
-      'bp': '현대건설',
-      'equipment': '25톤 크레인 (서울12가3456)',
-      'operator': '김운전',
-      'period': '2026-03-01 ~ 2026-06-30',
-      'priceType': '주간일대',
-      'status': '진행중',
-      'docValid': true,
-      'healthCheck': true,
-      'safetyEdu': true,
-      'preInspection': true,
-    },
-    {
-      'site': '송파 현장 B',
-      'bp': '삼성물산',
-      'equipment': '50톤 크레인 (경기34나5678)',
-      'operator': '이기사',
-      'period': '2026-04-01 ~ 2026-07-31',
-      'priceType': '주간O/T',
-      'status': '요청중',
-      'docValid': true,
-      'healthCheck': true,
-      'safetyEdu': false,
-      'preInspection': true,
-    },
-    {
-      'site': '분당 현장 C',
-      'bp': 'GS건설',
-      'equipment': '굴삭기 0.7m3 (인천56다7890)',
-      'operator': '박기사',
-      'period': '2026-02-01 ~ 2026-03-31',
-      'priceType': '야간',
-      'status': '종료',
-      'docValid': true,
-      'healthCheck': true,
-      'safetyEdu': true,
-      'preInspection': true,
-    },
-    {
-      'site': '일산 현장 D',
-      'bp': '대림산업',
-      'equipment': '25톤 크레인 (서울12가3456)',
-      'operator': '김운전',
-      'period': '2026-05-01 ~ 2026-08-31',
-      'priceType': '철야',
-      'status': '승인',
-      'docValid': true,
-      'healthCheck': false,
-      'safetyEdu': true,
-      'preInspection': false,
-    },
-  ];
+  List<Map<String, dynamic>> _deployments = [];
+  List<Map<String, dynamic>> _equipmentOptions = [];
+  List<Map<String, dynamic>> _personnelOptions = [];
+  bool _isLoading = true;
+  String? _error;
 
-  final List<Map<String, String>> _equipmentOptions = [
-    {'id': 'E001', 'name': '25톤 크레인 (서울12가3456)'},
-    {'id': 'E002', 'name': '50톤 크레인 (경기34나5678)'},
-    {'id': 'E003', 'name': '굴삭기 0.7m3 (인천56다7890)'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
 
-  final List<Map<String, String>> _personnelOptions = [
-    {'id': 'P001', 'name': '김운전'},
-    {'id': 'P002', 'name': '이기사'},
-    {'id': 'P003', 'name': '박기사'},
-  ];
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final responses = await Future.wait([
+        dioClient.get<dynamic>(ApiEndpoints.deploymentPlans),
+        dioClient.get<dynamic>(ApiEndpoints.equipments),
+        dioClient.get<dynamic>(ApiEndpoints.persons),
+      ]);
+
+      // Parse deployment plans
+      final plansData = responses[0].data;
+      if (plansData is List) {
+        _deployments = plansData.cast<Map<String, dynamic>>();
+      } else if (plansData is Map && plansData['content'] is List) {
+        _deployments = (plansData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _deployments = [];
+      }
+
+      // Parse equipment options
+      final equipData = responses[1].data;
+      if (equipData is List) {
+        _equipmentOptions = equipData.cast<Map<String, dynamic>>();
+      } else if (equipData is Map && equipData['content'] is List) {
+        _equipmentOptions = (equipData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _equipmentOptions = [];
+      }
+
+      // Parse personnel options
+      final persData = responses[2].data;
+      if (persData is List) {
+        _personnelOptions = persData.cast<Map<String, dynamic>>();
+      } else if (persData is Map && persData['content'] is List) {
+        _personnelOptions = (persData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _personnelOptions = [];
+      }
+    } catch (e) {
+      _error = e.toString();
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _mapStatus(dynamic status) {
+    final s = status?.toString().toUpperCase() ?? '';
+    switch (s) {
+      case 'IN_PROGRESS':
+      case 'ACTIVE':
+        return '진행중';
+      case 'REQUESTED':
+      case 'PENDING':
+        return '요청중';
+      case 'APPROVED':
+        return '승인';
+      case 'COMPLETED':
+      case 'ENDED':
+        return '종료';
+      default:
+        return status?.toString() ?? '';
+    }
+  }
 
   Color _statusColor(String status) {
     switch (status) {
@@ -161,7 +178,8 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
                     ),
                     items: _equipmentOptions
                         .map((e) => DropdownMenuItem(
-                            value: e['id'], child: Text(e['name']!)))
+                            value: (e['id'] ?? '').toString(),
+                            child: Text(e['vehicleNumber'] ?? e['name'] ?? e['id'].toString())))
                         .toList(),
                     onChanged: (v) =>
                         setDialogState(() => selectedEquipment = v),
@@ -174,7 +192,8 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
                     ),
                     items: _personnelOptions
                         .map((p) => DropdownMenuItem(
-                            value: p['id'], child: Text(p['name']!)))
+                            value: (p['id'] ?? '').toString(),
+                            child: Text(p['name'] ?? p['id'].toString())))
                         .toList(),
                     onChanged: (v) =>
                         setDialogState(() => selectedOperator = v),
@@ -251,11 +270,39 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
               child: const Text('취소'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('투입 요청이 전송되었습니다.')),
-                );
+                try {
+                  final dioClient = context.read<DioClient>();
+                  await dioClient.post<dynamic>(
+                    ApiEndpoints.deploymentPlans,
+                    data: {
+                      'siteName': site,
+                      'bpCompanyName': bp,
+                      'equipmentId': selectedEquipment,
+                      'operatorId': selectedOperator,
+                      'startDate': '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}',
+                      'endDate': '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}',
+                      'dayPrice': dayPriceCtrl.text,
+                      'otPrice': otPriceCtrl.text,
+                      'earlyPrice': earlyPriceCtrl.text,
+                      'nightPrice': nightPriceCtrl.text,
+                      'allNightPrice': allNightPriceCtrl.text,
+                    },
+                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('투입 요청이 전송되었습니다.'), backgroundColor: AppColors.success),
+                    );
+                    _loadData();
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('투입 요청 실패: $e'), backgroundColor: AppColors.error),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -323,64 +370,121 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
             ],
           ),
           const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('현장명')),
-                  DataColumn(label: Text('BP사')),
-                  DataColumn(label: Text('장비')),
-                  DataColumn(label: Text('운전원')),
-                  DataColumn(label: Text('기간')),
-                  DataColumn(label: Text('단가구분')),
-                  DataColumn(label: Text('투입조건')),
-                  DataColumn(label: Text('상태')),
+          if (_isLoading)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                  const SizedBox(height: 12),
+                  Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+                  const SizedBox(height: 8),
+                  Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  TextButton(onPressed: _loadData, child: const Text('다시 시도')),
                 ],
-                rows: _deployments
-                    .map((d) => DataRow(cells: [
-                          DataCell(Text(d['site'])),
-                          DataCell(Text(d['bp'])),
-                          DataCell(Text(d['equipment'])),
-                          DataCell(Text(d['operator'])),
-                          DataCell(Text(d['period'])),
-                          DataCell(Text(d['priceType'])),
+              ),
+            )
+          else if (_deployments.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.inbox_outlined, size: 48, color: AppColors.grey),
+                  const SizedBox(height: 12),
+                  Text('투입 현황이 없습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey)),
+                ],
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [
+                    DataColumn(label: Text('현장명')),
+                    DataColumn(label: Text('BP사')),
+                    DataColumn(label: Text('장비')),
+                    DataColumn(label: Text('운전원')),
+                    DataColumn(label: Text('기간')),
+                    DataColumn(label: Text('단가구분')),
+                    DataColumn(label: Text('투입조건')),
+                    DataColumn(label: Text('상태')),
+                  ],
+                  rows: _deployments
+                      .map((d) {
+                        final status = d['status'] ?? d['planStatus'] ?? '';
+                        final statusLabel = _mapStatus(status);
+                        final startDt = d['startDate'] ?? '';
+                        final endDt = d['endDate'] ?? '';
+                        final period = '$startDt ~ $endDt';
+                        return DataRow(cells: [
+                          DataCell(Text(d['siteName'] ?? d['site'] ?? '')),
+                          DataCell(Text(d['bpCompanyName'] ?? d['bp'] ?? '')),
+                          DataCell(Text(d['equipmentName'] ?? d['equipment'] ?? d['vehicleNumber'] ?? '')),
+                          DataCell(Text(d['operatorName'] ?? d['operator'] ?? '')),
+                          DataCell(Text(d['period'] ?? period)),
+                          DataCell(Text(d['priceType'] ?? '')),
                           DataCell(Wrap(
                             children: [
-                              _buildBadge('서류', d['docValid']),
-                              _buildBadge('건강', d['healthCheck']),
-                              _buildBadge('교육', d['safetyEdu']),
-                              _buildBadge('점검', d['preInspection']),
+                              _buildBadge('서류', d['docValid'] ?? d['documentValid'] ?? false),
+                              _buildBadge('건강', d['healthCheck'] ?? d['healthCheckValid'] ?? false),
+                              _buildBadge('교육', d['safetyEdu'] ?? d['safetyEducation'] ?? false),
+                              _buildBadge('점검', d['preInspection'] ?? d['preInspectionDone'] ?? false),
                             ],
                           )),
                           DataCell(Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: _statusColor(d['status'])
+                              color: _statusColor(statusLabel)
                                   .withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              d['status'],
+                              statusLabel,
                               style: TextStyle(
-                                color: _statusColor(d['status']),
+                                color: _statusColor(statusLabel),
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           )),
-                        ]))
-                    .toList(),
+                        ]);
+                      })
+                      .toList(),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

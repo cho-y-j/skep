@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class BpInspectionStatusPage extends StatefulWidget {
   const BpInspectionStatusPage({Key? key}) : super(key: key);
@@ -10,66 +13,102 @@ class BpInspectionStatusPage extends StatefulWidget {
 }
 
 class _BpInspectionStatusPageState extends State<BpInspectionStatusPage> {
-  final List<Map<String, dynamic>> _inspections = [
-    {
-      'plateNo': '서울12가3456',
-      'equipType': '25톤 크레인',
-      'completed': true,
-      'time': '07:30',
-      'inspector': '김운전',
-      'hasIssue': false,
-      'items': _generateItems(false),
-    },
-    {
-      'plateNo': '경기34나5678',
-      'equipType': '50톤 크레인',
-      'completed': true,
-      'time': '07:45',
-      'inspector': '이기사',
-      'hasIssue': true,
-      'items': _generateItems(true),
-    },
-    {
-      'plateNo': '인천56다7890',
-      'equipType': '굴삭기 0.7m3',
-      'completed': false,
-      'time': '-',
-      'inspector': '-',
-      'hasIssue': false,
-      'items': <Map<String, dynamic>>[],
-    },
-    {
-      'plateNo': '부산78라1234',
-      'equipType': '지게차 3톤',
-      'completed': true,
-      'time': '08:00',
-      'inspector': '최운전',
-      'hasIssue': false,
-      'items': _generateItems(false),
-    },
-  ];
-
+  List<Map<String, dynamic>> _inspections = [];
+  bool _isLoading = true;
+  String? _error;
   int? _expandedIndex;
 
-  static List<Map<String, dynamic>> _generateItems(bool withIssue) {
-    final items = [
-      {'name': '엔진오일 상태', 'ok': true},
-      {'name': '냉각수 상태', 'ok': true},
-      {'name': '유압호스 상태', 'ok': true},
-      {'name': '와이어로프 상태', 'ok': !withIssue},
-      {'name': '브레이크 작동', 'ok': true},
-      {'name': '조향장치 상태', 'ok': true},
-      {'name': '경고등/계기판', 'ok': true},
-      {'name': '안전장치 작동', 'ok': true},
-      {'name': '타이어/트랙 상태', 'ok': true},
-      {'name': '배기가스 상태', 'ok': true},
-      {'name': '외관 손상 여부', 'ok': !withIssue},
-    ];
-    return items;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.safetyInspections);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<Map<String, dynamic>> rawList;
+        if (data is List) {
+          rawList = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          rawList = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          rawList = [];
+        }
+        // Map API response to expected format
+        _inspections = rawList.map((insp) {
+          final status = (insp['status'] ?? '').toString().toUpperCase();
+          final completed = status == 'COMPLETED' || status == 'DONE' || insp['completed'] == true;
+          final hasIssue = insp['hasIssue'] == true || (insp['issueCount'] ?? 0) > 0;
+          // Parse inspection items
+          List<Map<String, dynamic>> items = [];
+          if (insp['items'] is List) {
+            items = (insp['items'] as List).map((item) {
+              if (item is Map<String, dynamic>) {
+                return {
+                  'name': item['itemName'] ?? item['name'] ?? '',
+                  'ok': item['result'] == 'OK' || item['ok'] == true || item['passed'] == true,
+                };
+              }
+              return <String, dynamic>{'name': '', 'ok': true};
+            }).toList();
+          }
+          return {
+            'id': insp['id'],
+            'plateNo': insp['vehicleNumber'] ?? insp['plateNo'] ?? '',
+            'equipType': insp['equipmentType'] ?? insp['equipType'] ?? '',
+            'completed': completed,
+            'time': insp['inspectionTime'] ?? insp['time'] ?? (completed ? '' : '-'),
+            'inspector': insp['inspectorName'] ?? insp['inspector'] ?? (completed ? '' : '-'),
+            'hasIssue': hasIssue,
+            'items': items,
+          };
+        }).toList();
+      }
+    } catch (e) {
+      _error = e.toString();
+      _inspections = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(48),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Container(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: 12),
+              Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+              const SizedBox(height: 8),
+              Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
+
     final completed =
         _inspections.where((i) => i['completed'] == true).length;
     final notCompleted =

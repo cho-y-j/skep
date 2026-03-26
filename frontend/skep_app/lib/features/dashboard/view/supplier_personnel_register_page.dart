@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/api_endpoints.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
 import 'package:skep_app/features/dashboard/view/supplier_personnel_page.dart';
 
@@ -486,7 +488,9 @@ class _SupplierPersonnelRegisterPageState
     }).toList();
   }
 
-  void _completeRegistration() {
+  bool _isSubmitting = false;
+
+  Future<void> _completeRegistration() async {
     if (!_canRegister()) {
       final errors = <String>[];
       if (_selectedPersonnelType == null) errors.add('인력 유형을 선택해주세요');
@@ -510,38 +514,66 @@ class _SupplierPersonnelRegisterPageState
       return;
     }
 
-    final personnel = RegisteredPersonnel(
-      personnelType: _selectedPersonnelType!,
-      name: _nameController.text.trim(),
-      phone: _phoneController.text.trim(),
-      birthDate: _birthDateController.text.trim(),
-      registeredAt: DateTime.now(),
-      documents: Map.from(_uploadedDocs),
-    );
+    setState(() => _isSubmitting = true);
 
-    PersonnelListStore.instance.personnelList.add(personnel);
+    try {
+      final dioClient = context.read<DioClient>();
+      final body = {
+        'type': _selectedPersonnelType,
+        'personnelType': _selectedPersonnelType,
+        'name': _nameController.text.trim(),
+        'phone': _phoneController.text.trim(),
+        'birthDate': _birthDateController.text.trim(),
+      };
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('인력이 등록되었습니다.'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+      await dioClient.post<dynamic>(ApiEndpoints.persons, data: body);
 
-    // 폼 초기화
-    setState(() {
-      _selectedPersonnelType = null;
-      _nameController.clear();
-      _phoneController.clear();
-      _birthDateController.clear();
-      _birthDate = null;
-      _uploadedDocs.clear();
-      _expiryDates.clear();
-      for (final c in _expiryControllers.values) {
-        c.dispose();
+      // Also add to local store for backward compatibility
+      final personnel = RegisteredPersonnel(
+        personnelType: _selectedPersonnelType!,
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        birthDate: _birthDateController.text.trim(),
+        registeredAt: DateTime.now(),
+        documents: Map.from(_uploadedDocs),
+      );
+      PersonnelListStore.instance.personnelList.add(personnel);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('인력이 등록되었습니다.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
-      _expiryControllers.clear();
-    });
+
+      // 폼 초기화
+      setState(() {
+        _selectedPersonnelType = null;
+        _nameController.clear();
+        _phoneController.clear();
+        _birthDateController.clear();
+        _birthDate = null;
+        _uploadedDocs.clear();
+        _expiryDates.clear();
+        for (final c in _expiryControllers.values) {
+          c.dispose();
+        }
+        _expiryControllers.clear();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('등록 실패: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   // ==================== 이미지 미리보기 ====================

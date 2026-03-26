@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/api_endpoints.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
 import 'package:skep_app/features/dashboard/view/supplier_equipment_page.dart';
 
@@ -498,7 +500,9 @@ class _SupplierEquipmentRegisterPageState
     }).toList();
   }
 
-  void _completeRegistration() {
+  bool _isSubmitting = false;
+
+  Future<void> _completeRegistration() async {
     if (!_canRegister()) {
       // 필수 필드 확인
       final errors = <String>[];
@@ -523,39 +527,69 @@ class _SupplierEquipmentRegisterPageState
       return;
     }
 
-    final equipment = RegisteredEquipment(
-      vehicleNumber: _vehicleNumberController.text.trim(),
-      equipmentType: _selectedEquipmentType!,
-      modelName: _modelNameController.text.trim(),
-      manufacturer: _manufacturerController.text.trim(),
-      manufacturingYear: _manufacturingYearController.text.trim(),
-      registeredAt: DateTime.now(),
-      documents: Map.from(_uploadedDocs),
-    );
+    setState(() => _isSubmitting = true);
 
-    EquipmentListStore.instance.equipmentList.add(equipment);
+    try {
+      final dioClient = context.read<DioClient>();
+      final body = {
+        'vehicleNumber': _vehicleNumberController.text.trim(),
+        'type': _selectedEquipmentType,
+        'equipmentType': _selectedEquipmentType,
+        'model': _modelNameController.text.trim(),
+        'modelName': _modelNameController.text.trim(),
+        'manufacturer': _manufacturerController.text.trim(),
+        'manufacturingYear': _manufacturingYearController.text.trim(),
+      };
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('장비가 등록되었습니다.'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+      await dioClient.post<dynamic>(ApiEndpoints.equipments, data: body);
 
-    // 폼 초기화
-    setState(() {
-      _selectedEquipmentType = null;
-      _vehicleNumberController.clear();
-      _modelNameController.clear();
-      _manufacturerController.clear();
-      _manufacturingYearController.clear();
-      _uploadedDocs.clear();
-      _expiryDates.clear();
-      for (final c in _expiryControllers.values) {
-        c.dispose();
+      // Also add to local store for backward compatibility
+      final equipment = RegisteredEquipment(
+        vehicleNumber: _vehicleNumberController.text.trim(),
+        equipmentType: _selectedEquipmentType!,
+        modelName: _modelNameController.text.trim(),
+        manufacturer: _manufacturerController.text.trim(),
+        manufacturingYear: _manufacturingYearController.text.trim(),
+        registeredAt: DateTime.now(),
+        documents: Map.from(_uploadedDocs),
+      );
+      EquipmentListStore.instance.equipmentList.add(equipment);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('장비가 등록되었습니다.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
-      _expiryControllers.clear();
-    });
+
+      // 폼 초기화
+      setState(() {
+        _selectedEquipmentType = null;
+        _vehicleNumberController.clear();
+        _modelNameController.clear();
+        _manufacturerController.clear();
+        _manufacturingYearController.clear();
+        _uploadedDocs.clear();
+        _expiryDates.clear();
+        for (final c in _expiryControllers.values) {
+          c.dispose();
+        }
+        _expiryControllers.clear();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('등록 실패: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   // ==================== 이미지 미리보기 ====================

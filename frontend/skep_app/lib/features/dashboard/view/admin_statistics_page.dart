@@ -1,26 +1,149 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
-class AdminStatisticsPage extends StatelessWidget {
+class AdminStatisticsPage extends StatefulWidget {
   const AdminStatisticsPage({Key? key}) : super(key: key);
 
   @override
+  State<AdminStatisticsPage> createState() => _AdminStatisticsPageState();
+}
+
+class _AdminStatisticsPageState extends State<AdminStatisticsPage> {
+  bool _isLoading = true;
+  String? _error;
+
+  int _equipmentTotal = 0;
+  int _personnelTotal = 0;
+  int _companyTotal = 0;
+  List<Map<String, dynamic>> _equipments = [];
+  List<Map<String, dynamic>> _companies = [];
+  List<Map<String, dynamic>> _settlements = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+
+      final results = await Future.wait([
+        dioClient.get<dynamic>(ApiEndpoints.equipments).catchError((_) => null),
+        dioClient.get<dynamic>(ApiEndpoints.persons).catchError((_) => null),
+        dioClient.get<dynamic>(ApiEndpoints.companies).catchError((_) => null),
+        dioClient.get<dynamic>(ApiEndpoints.settlements).catchError((_) => null),
+      ]);
+
+      // Equipment
+      _equipments = _extractList(results[0]?.data);
+      _equipmentTotal = _equipments.length;
+
+      // Personnel
+      final personnelList = _extractList(results[1]?.data);
+      _personnelTotal = personnelList.length;
+
+      // Companies
+      _companies = _extractList(results[2]?.data);
+      _companyTotal = _companies.length;
+
+      // Settlements
+      _settlements = _extractList(results[3]?.data);
+    } catch (e) {
+      _error = e.toString();
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<Map<String, dynamic>> _extractList(dynamic data) {
+    if (data == null) return [];
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    if (data is Map) {
+      if (data['content'] is List) return (data['content'] as List).cast<Map<String, dynamic>>();
+      if (data['data'] is List) return (data['data'] as List).cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  int _countByStatus(List<Map<String, dynamic>> list, String status) {
+    return list.where((item) {
+      final s = (item['status'] ?? '').toString();
+      return s == status;
+    }).length;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 56, color: Color(0xFFCBD5E1)),
+            const SizedBox(height: 16),
+            const Text('데이터를 불러오는데 실패했습니다', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF94A3B8))),
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(fontSize: 13, color: Color(0xFFCBD5E1)), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+          ],
+        ),
+      );
+    }
+
+    final activeEquip = _countByStatus(_equipments, 'ACTIVE');
+    final idleEquip = _countByStatus(_equipments, 'IDLE');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('통계', style: AppTextStyles.headlineLarge),
-          const SizedBox(height: 4),
-          Text(
-            '전체 플랫폼 통계를 확인합니다.',
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('통계', style: AppTextStyles.headlineLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      '전체 플랫폼 통계를 확인합니다.',
+                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: _loadData,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('새로고침'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.white,
+                  foregroundColor: AppColors.greyDark,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
-          // 장비 현황 카드
-          Text('전체 장비 현황', style: AppTextStyles.headlineSmall),
+          // 전체 현황 카드
+          Text('전체 현황', style: AppTextStyles.headlineSmall),
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -33,20 +156,17 @@ class AdminStatisticsPage extends StatelessWidget {
                 crossAxisSpacing: 16,
                 childAspectRatio: 2.0,
                 children: [
-                  _buildStatCard('등록', '24대', Icons.app_registration,
-                      AppColors.primary),
-                  _buildStatCard('투입중', '12대', Icons.engineering,
-                      AppColors.success),
-                  _buildStatCard('대기', '9대', Icons.hourglass_empty,
-                      AppColors.warning),
-                  _buildStatCard('만료', '3대', Icons.block, AppColors.error),
+                  _buildStatCard('등록 장비', '$_equipmentTotal대', Icons.build_circle_outlined, AppColors.primary),
+                  _buildStatCard('등록 인력', '$_personnelTotal명', Icons.people_outline, AppColors.success),
+                  _buildStatCard('등록 회사', '$_companyTotal개', Icons.business_outlined, AppColors.info),
+                  _buildStatCard('정산 건수', '${_settlements.length}건', Icons.payments_outlined, AppColors.warning),
                 ],
               );
             },
           ),
           const SizedBox(height: 24),
-          // 인력 현황 카드
-          Text('전체 인력 현황', style: AppTextStyles.headlineSmall),
+          // 장비 상태별 현황
+          Text('장비 상태별 현황', style: AppTextStyles.headlineSmall),
           const SizedBox(height: 12),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -59,21 +179,17 @@ class AdminStatisticsPage extends StatelessWidget {
                 crossAxisSpacing: 16,
                 childAspectRatio: 2.0,
                 children: [
-                  _buildStatCard('등록', '31명', Icons.people_outline,
-                      AppColors.primary),
-                  _buildStatCard('투입중', '18명', Icons.person_pin,
-                      AppColors.success),
-                  _buildStatCard('대기', '11명', Icons.person_off_outlined,
-                      AppColors.warning),
-                  _buildStatCard('서류만료', '2명', Icons.warning_amber,
-                      AppColors.error),
+                  _buildStatCard('전체', '$_equipmentTotal대', Icons.app_registration, AppColors.primary),
+                  _buildStatCard('가동중', '$activeEquip대', Icons.engineering, AppColors.success),
+                  _buildStatCard('대기', '$idleEquip대', Icons.hourglass_empty, AppColors.warning),
+                  _buildStatCard('기타', '${_equipmentTotal - activeEquip - idleEquip}대', Icons.more_horiz, AppColors.grey),
                 ],
               );
             },
           ),
           const SizedBox(height: 24),
-          // 공급사별 투입 현황
-          Text('공급사별 투입 현황', style: AppTextStyles.headlineSmall),
+          // 회사 목록
+          Text('등록 회사 ($_companyTotal개)', style: AppTextStyles.headlineSmall),
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
@@ -82,29 +198,35 @@ class AdminStatisticsPage extends StatelessWidget {
               border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('공급사')),
-                  DataColumn(label: Text('등록장비'), numeric: true),
-                  DataColumn(label: Text('투입장비'), numeric: true),
-                  DataColumn(label: Text('등록인력'), numeric: true),
-                  DataColumn(label: Text('투입인력'), numeric: true),
-                  DataColumn(label: Text('투입률')),
-                ],
-                rows: [
-                  _buildSupplierRow('(주)한국크레인', 8, 5, 15, 10, 62.5),
-                  _buildSupplierRow('삼성중장비', 5, 3, 10, 6, 60.0),
-                  _buildSupplierRow('대한건기', 3, 1, 6, 2, 33.3),
-                  _buildSupplierRow('기타', 8, 3, 0, 0, 37.5),
-                ],
-              ),
-            ),
+            child: _companies.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('등록된 회사가 없습니다.', style: TextStyle(color: Color(0xFF94A3B8)))),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('회사명')),
+                        DataColumn(label: Text('유형')),
+                        DataColumn(label: Text('상태')),
+                      ],
+                      rows: _companies.take(10).map((c) {
+                        final name = c['name']?.toString() ?? c['companyName']?.toString() ?? '-';
+                        final type = c['type']?.toString() ?? c['companyType']?.toString() ?? '-';
+                        final status = c['status']?.toString() ?? '-';
+                        return DataRow(cells: [
+                          DataCell(Text(name)),
+                          DataCell(Text(type)),
+                          DataCell(Text(status)),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
           ),
           const SizedBox(height: 24),
-          // BP사별 결제 현황
-          Text('BP사별 결제 현황', style: AppTextStyles.headlineSmall),
+          // 정산 현황
+          Text('정산 현황 (${_settlements.length}건)', style: AppTextStyles.headlineSmall),
           const SizedBox(height: 12),
           Container(
             width: double.infinity,
@@ -113,116 +235,34 @@ class AdminStatisticsPage extends StatelessWidget {
               border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('BP사')),
-                  DataColumn(label: Text('투입건수'), numeric: true),
-                  DataColumn(label: Text('거래액'), numeric: true),
-                  DataColumn(label: Text('지급완료'), numeric: true),
-                  DataColumn(label: Text('미지급'), numeric: true),
-                ],
-                rows: const [
-                  DataRow(cells: [
-                    DataCell(Text('현대건설')),
-                    DataCell(Text('5')),
-                    DataCell(Text('78,000,000원')),
-                    DataCell(Text('45,000,000원')),
-                    DataCell(Text('33,000,000원')),
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text('삼성물산')),
-                    DataCell(Text('3')),
-                    DataCell(Text('29,250,000원')),
-                    DataCell(Text('29,250,000원')),
-                    DataCell(Text('0원')),
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text('GS건설')),
-                    DataCell(Text('2')),
-                    DataCell(Text('16,500,000원')),
-                    DataCell(Text('0원')),
-                    DataCell(Text('16,500,000원')),
-                  ]),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          // 서류 만료 현황
-          Text('서류 만료 현황', style: AppTextStyles.headlineSmall),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('구분')),
-                  DataColumn(label: Text('전체'), numeric: true),
-                  DataColumn(label: Text('유효'), numeric: true),
-                  DataColumn(label: Text('D-30 이내'), numeric: true),
-                  DataColumn(label: Text('D-7 이내'), numeric: true),
-                  DataColumn(label: Text('만료'), numeric: true),
-                ],
-                rows: const [
-                  DataRow(cells: [
-                    DataCell(Text('장비 서류')),
-                    DataCell(Text('48')),
-                    DataCell(Text('38')),
-                    DataCell(Text('5')),
-                    DataCell(Text('3')),
-                    DataCell(Text('2')),
-                  ]),
-                  DataRow(cells: [
-                    DataCell(Text('인력 서류')),
-                    DataCell(Text('62')),
-                    DataCell(Text('54')),
-                    DataCell(Text('4')),
-                    DataCell(Text('2')),
-                    DataCell(Text('2')),
-                  ]),
-                ],
-              ),
-            ),
+            child: _settlements.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('정산 데이터가 없습니다.', style: TextStyle(color: Color(0xFF94A3B8)))),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('정산명')),
+                        DataColumn(label: Text('기간')),
+                        DataColumn(label: Text('금액')),
+                        DataColumn(label: Text('상태')),
+                      ],
+                      rows: _settlements.take(10).map((s) {
+                        return DataRow(cells: [
+                          DataCell(Text(s['name']?.toString() ?? s['title']?.toString() ?? '-')),
+                          DataCell(Text(s['period']?.toString() ?? s['month']?.toString() ?? '-')),
+                          DataCell(Text(s['totalAmount']?.toString() ?? s['amount']?.toString() ?? '-')),
+                          DataCell(Text(s['status']?.toString() ?? '-')),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
           ),
         ],
       ),
     );
-  }
-
-  DataRow _buildSupplierRow(String name, int regEquip, int depEquip,
-      int regPer, int depPer, double rate) {
-    return DataRow(cells: [
-      DataCell(Text(name)),
-      DataCell(Text('$regEquip')),
-      DataCell(Text('$depEquip')),
-      DataCell(Text('$regPer')),
-      DataCell(Text('$depPer')),
-      DataCell(Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: rate >= 50
-              ? AppColors.success.withOpacity(0.1)
-              : AppColors.warning.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          '${rate.toStringAsFixed(1)}%',
-          style: TextStyle(
-            color: rate >= 50 ? AppColors.success : AppColors.warning,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      )),
-    ]);
   }
 
   Widget _buildStatCard(

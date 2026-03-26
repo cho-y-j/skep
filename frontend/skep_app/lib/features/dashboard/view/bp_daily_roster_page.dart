@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class BpDailyRosterPage extends StatefulWidget {
   const BpDailyRosterPage({Key? key}) : super(key: key);
@@ -11,42 +14,46 @@ class BpDailyRosterPage extends StatefulWidget {
 
 class _BpDailyRosterPageState extends State<BpDailyRosterPage> {
   late DateTime _selectedDate;
-
-  final List<Map<String, dynamic>> _roster = [
-    {
-      'equipType': '25톤 크레인',
-      'plateNo': '서울12가3456',
-      'operator': '김운전',
-      'guide': '박유도',
-      'status': '대기',
-    },
-    {
-      'equipType': '50톤 크레인',
-      'plateNo': '경기34나5678',
-      'operator': '이기사',
-      'guide': '최유도',
-      'status': '승인',
-    },
-    {
-      'equipType': '굴삭기 0.7m3',
-      'plateNo': '인천56다7890',
-      'operator': '박기사',
-      'guide': '김유도',
-      'status': '대기',
-    },
-    {
-      'equipType': '지게차 3톤',
-      'plateNo': '부산78라1234',
-      'operator': '최운전',
-      'guide': '-',
-      'status': '교체',
-    },
-  ];
+  List<Map<String, dynamic>> _roster = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _selectedDate = DateTime.now().add(const Duration(days: 1));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+      final response = await dioClient.get<dynamic>(
+        ApiEndpoints.dailyRosters,
+        queryParameters: {'date': dateStr},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _roster = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _roster = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _roster = [];
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _roster = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   Color _statusColor(String status) {
@@ -66,17 +73,49 @@ class _BpDailyRosterPageState extends State<BpDailyRosterPage> {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   }
 
-  void _approveAll() {
-    setState(() {
-      for (final r in _roster) {
-        if (r['status'] == '대기') {
-          r['status'] = '승인';
+  String _mapRosterStatus(dynamic status) {
+    final s = status?.toString().toUpperCase() ?? '';
+    switch (s) {
+      case 'APPROVED':
+        return '승인';
+      case 'PENDING':
+        return '대기';
+      case 'REJECTED':
+      case 'REPLACEMENT':
+        return '교체';
+      default:
+        return status?.toString() ?? '';
+    }
+  }
+
+  Future<void> _approveAll() async {
+    try {
+      final dioClient = context.read<DioClient>();
+      final pending = _roster.where((r) {
+        final s = (r['status'] ?? '').toString().toUpperCase();
+        return s == '대기' || s == 'PENDING';
+      }).toList();
+      for (final r in pending) {
+        final id = r['id'];
+        if (id != null) {
+          await dioClient.put<dynamic>(
+            ApiEndpoints.dailyRoster.replaceAll('{id}', id.toString()) + '/approve',
+          );
         }
       }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('전체 승인되었습니다.')),
-    );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('전체 승인되었습니다.'), backgroundColor: AppColors.success),
+        );
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('전체 승인 실패: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   void _keepPrevious() {
@@ -85,19 +124,50 @@ class _BpDailyRosterPageState extends State<BpDailyRosterPage> {
     );
   }
 
-  void _approveOne(int index) {
-    setState(() {
-      _roster[index]['status'] = '승인';
-    });
+  Future<void> _approveOne(int index) async {
+    final id = _roster[index]['id'];
+    if (id == null) return;
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.put<dynamic>(
+        ApiEndpoints.dailyRoster.replaceAll('{id}', id.toString()) + '/approve',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('승인되었습니다.'), backgroundColor: AppColors.success),
+        );
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('승인 실패: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
-  void _requestReplacement(int index) {
-    setState(() {
-      _roster[index]['status'] = '교체';
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('교체 요청이 전송되었습니다.')),
-    );
+  Future<void> _requestReplacement(int index) async {
+    final id = _roster[index]['id'];
+    if (id == null) return;
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.put<dynamic>(
+        ApiEndpoints.dailyRoster.replaceAll('{id}', id.toString()) + '/reject',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('교체 요청이 전송되었습니다.'), backgroundColor: AppColors.warning),
+        );
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('교체 요청 실패: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   @override
@@ -138,6 +208,7 @@ class _BpDailyRosterPageState extends State<BpDailyRosterPage> {
                     );
                     if (d != null) {
                       setState(() => _selectedDate = d);
+                      _loadData();
                     }
                   },
                   child: Container(
@@ -170,71 +241,122 @@ class _BpDailyRosterPageState extends State<BpDailyRosterPage> {
           ),
           const SizedBox(height: 16),
           // 명단 테이블
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('장비유형')),
-                  DataColumn(label: Text('차량번호')),
-                  DataColumn(label: Text('운전원')),
-                  DataColumn(label: Text('유도원')),
-                  DataColumn(label: Text('상태')),
-                  DataColumn(label: Text('작업')),
+          if (_isLoading)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                  const SizedBox(height: 12),
+                  Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+                  const SizedBox(height: 8),
+                  Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  TextButton(onPressed: _loadData, child: const Text('다시 시도')),
                 ],
-                rows: List.generate(_roster.length, (i) {
-                  final r = _roster[i];
-                  return DataRow(cells: [
-                    DataCell(Text(r['equipType'])),
-                    DataCell(Text(r['plateNo'])),
-                    DataCell(Text(r['operator'])),
-                    DataCell(Text(r['guide'])),
-                    DataCell(Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _statusColor(r['status']).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        r['status'],
-                        style: TextStyle(
-                          color: _statusColor(r['status']),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+              ),
+            )
+          else if (_roster.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.inbox_outlined, size: 48, color: AppColors.grey),
+                  const SizedBox(height: 12),
+                  Text('해당 날짜의 명단이 없습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.grey)),
+                ],
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: const [
+                    DataColumn(label: Text('장비유형')),
+                    DataColumn(label: Text('차량번호')),
+                    DataColumn(label: Text('운전원')),
+                    DataColumn(label: Text('유도원')),
+                    DataColumn(label: Text('상태')),
+                    DataColumn(label: Text('작업')),
+                  ],
+                  rows: List.generate(_roster.length, (i) {
+                    final r = _roster[i];
+                    final status = _mapRosterStatus(r['status'] ?? r['rosterStatus'] ?? '');
+                    return DataRow(cells: [
+                      DataCell(Text(r['equipType'] ?? r['equipmentType'] ?? r['equipmentName'] ?? '')),
+                      DataCell(Text(r['plateNo'] ?? r['vehicleNumber'] ?? '')),
+                      DataCell(Text(r['operator'] ?? r['operatorName'] ?? '')),
+                      DataCell(Text(r['guide'] ?? r['guideName'] ?? '-')),
+                      DataCell(Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _statusColor(status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                    )),
-                    DataCell(r['status'] == '대기'
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton(
-                                onPressed: () => _approveOne(i),
-                                style: TextButton.styleFrom(
-                                    foregroundColor: AppColors.success),
-                                child: const Text('승인'),
-                              ),
-                              TextButton(
-                                onPressed: () => _requestReplacement(i),
-                                style: TextButton.styleFrom(
-                                    foregroundColor: AppColors.error),
-                                child: const Text('교체요청'),
-                              ),
-                            ],
-                          )
-                        : const Text('-')),
-                  ]);
-                }),
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            color: _statusColor(status),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )),
+                      DataCell(status == '대기'
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextButton(
+                                  onPressed: () => _approveOne(i),
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.success),
+                                  child: const Text('승인'),
+                                ),
+                                TextButton(
+                                  onPressed: () => _requestReplacement(i),
+                                  style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.error),
+                                  child: const Text('교체요청'),
+                                ),
+                              ],
+                            )
+                          : const Text('-')),
+                    ]);
+                  }),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

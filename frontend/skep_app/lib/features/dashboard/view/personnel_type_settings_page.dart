@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
+
+// TODO: Replace local mock data with backend API when personnel-type settings endpoint is available.
+// Currently no dedicated endpoint exists for personnel type configurations.
+// Candidate: GET/POST /api/equipment/persons/types (not yet in ApiEndpoints)
 
 class PersonnelTypeSettingsPage extends StatefulWidget {
   const PersonnelTypeSettingsPage({Key? key}) : super(key: key);

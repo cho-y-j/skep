@@ -1,7 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
 
 /// 등록된 인력 모델
@@ -146,8 +149,9 @@ class SupplierPersonnelPage extends StatefulWidget {
 
 class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
   final DocumentTypeRepository _docRepo = DocumentTypeRepository.instance;
-  List<RegisteredPersonnel> get _personnelList =>
-      PersonnelListStore.instance.personnelList;
+  List<Map<String, dynamic>> _apiPersonnel = [];
+  bool _isLoading = true;
+  String? _error;
 
   int? _expandedIndex;
 
@@ -159,28 +163,77 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
   bool _sortAscending = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadPersonnel());
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  List<RegisteredPersonnel> get _filteredList {
-    var list = List<RegisteredPersonnel>.from(_personnelList);
+  Future<void> _loadPersonnel() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.persons);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _apiPersonnel = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _apiPersonnel = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _apiPersonnel = [];
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _apiPersonnel = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deletePersonnelApi(int index) async {
+    final p = _apiPersonnel[index];
+    final id = p['id'];
+    if (id == null) return;
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.delete<dynamic>(
+        ApiEndpoints.person.replaceAll('{id}', id.toString()),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('인력이 삭제되었습니다.'), backgroundColor: AppColors.success),
+      );
+      _loadPersonnel();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('삭제 실패: $e'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredList {
+    var list = List<Map<String, dynamic>>.from(_apiPersonnel);
 
     // 상태 필터
     if (_statusFilter != '전체') {
       list = list.where((p) {
+        final status = p['status']?.toString();
         switch (_statusFilter) {
-          case '완료':
-            return p.docStatus == PersonnelDocStatus.complete;
-          case '만료임박':
-            return p.docStatus == PersonnelDocStatus.expiringSoon;
-          case '서류미비':
-            return p.docStatus == PersonnelDocStatus.incomplete;
-          case '만료':
-            return p.docStatus == PersonnelDocStatus.expired;
-          default:
-            return true;
+          case '완료': return status == 'ACTIVE' || status == 'COMPLETE';
+          case '만료임박': return status == 'EXPIRING_SOON';
+          case '서류미비': return status == 'INCOMPLETE';
+          case '만료': return status == 'EXPIRED' || status == 'INACTIVE';
+          default: return true;
         }
       }).toList();
     }
@@ -189,9 +242,10 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       list = list.where((p) {
-        return p.name.toLowerCase().contains(query) ||
-            p.personnelType.toLowerCase().contains(query) ||
-            p.phone.toLowerCase().contains(query);
+        final name = (p['name'] ?? '').toString().toLowerCase();
+        final type = (p['type'] ?? p['personnelType'] ?? p['personnel_type'] ?? '').toString().toLowerCase();
+        final phone = (p['phone'] ?? p['phoneNumber'] ?? '').toString().toLowerCase();
+        return name.contains(query) || type.contains(query) || phone.contains(query);
       }).toList();
     }
 
@@ -200,23 +254,12 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
       list.sort((a, b) {
         int result;
         switch (_sortColumnIndex) {
-          case 0:
-            result = a.name.compareTo(b.name);
-            break;
-          case 1:
-            result = a.personnelType.compareTo(b.personnelType);
-            break;
-          case 2:
-            result = a.phone.compareTo(b.phone);
-            break;
-          case 3:
-            result = a.docStatus.index.compareTo(b.docStatus.index);
-            break;
-          case 4:
-            result = a.registeredAt.compareTo(b.registeredAt);
-            break;
-          default:
-            result = 0;
+          case 0: result = (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString()); break;
+          case 1: result = (a['type'] ?? a['personnelType'] ?? '').toString().compareTo((b['type'] ?? b['personnelType'] ?? '').toString()); break;
+          case 2: result = (a['phone'] ?? '').toString().compareTo((b['phone'] ?? '').toString()); break;
+          case 3: result = (a['status'] ?? '').toString().compareTo((b['status'] ?? '').toString()); break;
+          case 4: result = (a['createdAt'] ?? a['created_at'] ?? '').toString().compareTo((b['createdAt'] ?? b['created_at'] ?? '').toString()); break;
+          default: result = 0;
         }
         return _sortAscending ? result : -result;
       });
@@ -233,11 +276,13 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
   }
 
   void _deletePersonnel(int originalIndex) {
+    final p = _apiPersonnel[originalIndex];
+    final name = p['name'] ?? '인력';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('삭제 확인'),
-        content: Text("'${_personnelList[originalIndex].name}' 인력을 삭제하시겠습니까?"),
+        content: Text("'$name' 인력을 삭제하시겠습니까?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -245,8 +290,8 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              setState(() => _personnelList.removeAt(originalIndex));
               Navigator.of(ctx).pop();
+              _deletePersonnelApi(originalIndex);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
@@ -267,12 +312,28 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 헤더
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              const Text('인력 관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-              const SizedBox(height: 4),
-              Text('등록된 인력 목록을 확인하고 상세 정보를 관리하세요.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('인력 관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+                    const SizedBox(height: 4),
+                    Text('등록된 인력 목록을 확인하고 상세 정보를 관리하세요.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: _loadPersonnel,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('새로고침'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -328,7 +389,39 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
             ),
           ),
           const SizedBox(height: 16),
-          if (_personnelList.isEmpty)
+          if (_isLoading)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                  const SizedBox(height: 12),
+                  Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+                  const SizedBox(height: 8),
+                  Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  TextButton(onPressed: _loadPersonnel, child: const Text('다시 시도')),
+                ],
+              ),
+            )
+          else if (_apiPersonnel.isEmpty)
             _buildEmptyState()
           else if (_filteredList.isEmpty)
             _buildNoResultState()
@@ -383,6 +476,16 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
     );
   }
 
+  String _formatDate(dynamic date) {
+    if (date == null) return '-';
+    try {
+      final dt = DateTime.parse(date.toString());
+      return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return date.toString();
+    }
+  }
+
   Widget _buildPersonnelList() {
     final filtered = _filteredList;
     return Column(
@@ -419,13 +522,14 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
                 DataColumn(label: const Text('이름'), onSort: _onSort),
                 DataColumn(label: const Text('인력유형'), onSort: _onSort),
                 DataColumn(label: const Text('연락처'), onSort: _onSort),
-                DataColumn(label: const Text('서류상태'), onSort: _onSort),
+                DataColumn(label: const Text('상태'), onSort: _onSort),
                 DataColumn(label: const Text('등록일'), onSort: _onSort),
                 const DataColumn(label: Text('관리')),
               ],
               rows: List.generate(filtered.length, (i) {
                 final p = filtered[i];
-                final originalIndex = _personnelList.indexOf(p);
+                final originalIndex = _apiPersonnel.indexOf(p);
+                final status = p['status']?.toString() ?? '-';
                 return DataRow(
                   selected: _expandedIndex != null && originalIndex == _expandedIndex,
                   onSelectChanged: (_) {
@@ -434,13 +538,18 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
                     });
                   },
                   cells: [
-                    DataCell(Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600))),
-                    DataCell(Text(p.personnelType)),
-                    DataCell(Text(p.phone)),
-                    DataCell(_buildDocStatusBadge(p)),
-                    DataCell(Text(
-                      '${p.registeredAt.year}.${p.registeredAt.month.toString().padLeft(2, '0')}.${p.registeredAt.day.toString().padLeft(2, '0')}',
+                    DataCell(Text((p['name'] ?? '-').toString(), style: const TextStyle(fontWeight: FontWeight.w600))),
+                    DataCell(Text((p['type'] ?? p['personnelType'] ?? p['personnel_type'] ?? '-').toString())),
+                    DataCell(Text((p['phone'] ?? p['phoneNumber'] ?? '-').toString())),
+                    DataCell(Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (status == 'ACTIVE' ? AppColors.success : AppColors.grey).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(status, style: TextStyle(color: status == 'ACTIVE' ? AppColors.success : AppColors.grey, fontWeight: FontWeight.w600, fontSize: 12)),
                     )),
+                    DataCell(Text(_formatDate(p['createdAt'] ?? p['created_at']))),
                     DataCell(
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -468,9 +577,45 @@ class _SupplierPersonnelPageState extends State<SupplierPersonnelPage> {
             ),
           ),
         ),
-        if (_expandedIndex != null && _expandedIndex! < _personnelList.length)
-          _buildPersonnelDetail(_personnelList[_expandedIndex!]),
+        if (_expandedIndex != null && _expandedIndex! < _apiPersonnel.length)
+          _buildApiPersonnelDetail(_apiPersonnel[_expandedIndex!]),
       ],
+    );
+  }
+
+  Widget _buildApiPersonnelDetail(Map<String, dynamic> p) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person_outlined, color: AppColors.primary, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                '${p['type'] ?? p['personnelType'] ?? '-'} - ${p['name'] ?? '-'}',
+                style: AppTextStyles.headlineSmall.copyWith(color: AppColors.primary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow('이름', (p['name'] ?? '-').toString()),
+          _buildInfoRow('인력유형', (p['type'] ?? p['personnelType'] ?? '-').toString()),
+          _buildInfoRow('연락처', (p['phone'] ?? p['phoneNumber'] ?? '-').toString()),
+          _buildInfoRow('생년월일', (p['birthDate'] ?? p['birth_date'] ?? '-').toString()),
+          _buildInfoRow('상태', (p['status'] ?? '-').toString()),
+          _buildInfoRow('등록일', _formatDate(p['createdAt'] ?? p['created_at'])),
+        ],
+      ),
     );
   }
 

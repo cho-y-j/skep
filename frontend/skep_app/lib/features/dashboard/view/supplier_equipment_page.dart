@@ -1,7 +1,10 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
 
 /// 등록된 장비 모델
@@ -219,8 +222,9 @@ class SupplierEquipmentPage extends StatefulWidget {
 
 class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
   final DocumentTypeRepository _docRepo = DocumentTypeRepository.instance;
-  List<RegisteredEquipment> get _equipmentList =>
-      EquipmentListStore.instance.equipmentList;
+  List<Map<String, dynamic>> _apiEquipments = [];
+  bool _isLoading = true;
+  String? _error;
 
   int? _expandedIndex;
 
@@ -232,26 +236,80 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
   bool _sortAscending = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadEquipments());
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  List<RegisteredEquipment> get _filteredList {
-    var list = List<RegisteredEquipment>.from(_equipmentList);
+  Future<void> _loadEquipments() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.equipments);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data is List) {
+          _apiEquipments = data.cast<Map<String, dynamic>>();
+        } else if (data is Map && data['content'] is List) {
+          _apiEquipments = (data['content'] as List).cast<Map<String, dynamic>>();
+        } else {
+          _apiEquipments = [];
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
+      _apiEquipments = [];
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _deleteEquipmentApi(int index) async {
+    final eq = _apiEquipments[index];
+    final id = eq['id'];
+    if (id == null) return;
+    try {
+      final dioClient = context.read<DioClient>();
+      await dioClient.delete<dynamic>(
+        ApiEndpoints.equipment.replaceAll('{id}', id.toString()),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('장비가 삭제되었습니다.'), backgroundColor: AppColors.success),
+      );
+      _loadEquipments();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('삭제 실패: $e'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredList {
+    var list = List<Map<String, dynamic>>.from(_apiEquipments);
 
     // 상태 필터
     if (_statusFilter != '전체') {
       list = list.where((eq) {
+        final status = eq['status']?.toString();
         switch (_statusFilter) {
           case '완료':
-            return eq.docStatus == DocStatusType.complete;
+            return status == 'ACTIVE' || status == 'DEPLOYED';
           case '만료임박':
-            return eq.docStatus == DocStatusType.expiringSoon;
+            return status == 'EXPIRING_SOON';
           case '서류미비':
-            return eq.docStatus == DocStatusType.incomplete;
+            return status == 'INCOMPLETE';
           case '만료':
-            return eq.docStatus == DocStatusType.expired;
+            return status == 'EXPIRED' || status == 'INACTIVE';
           default:
             return true;
         }
@@ -262,10 +320,14 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       list = list.where((eq) {
-        return eq.vehicleNumber.toLowerCase().contains(query) ||
-            eq.equipmentType.toLowerCase().contains(query) ||
-            eq.modelName.toLowerCase().contains(query) ||
-            eq.manufacturer.toLowerCase().contains(query);
+        final vehicleNumber = (eq['vehicleNumber'] ?? eq['vehicle_number'] ?? '').toString().toLowerCase();
+        final equipmentType = (eq['type'] ?? eq['equipment_type'] ?? eq['equipmentType'] ?? '').toString().toLowerCase();
+        final modelName = (eq['model'] ?? eq['modelName'] ?? eq['model_name'] ?? '').toString().toLowerCase();
+        final manufacturer = (eq['manufacturer'] ?? '').toString().toLowerCase();
+        return vehicleNumber.contains(query) ||
+            equipmentType.contains(query) ||
+            modelName.contains(query) ||
+            manufacturer.contains(query);
       }).toList();
     }
 
@@ -275,19 +337,19 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
         int result;
         switch (_sortColumnIndex) {
           case 0:
-            result = a.vehicleNumber.compareTo(b.vehicleNumber);
+            result = (a['vehicleNumber'] ?? a['vehicle_number'] ?? '').toString().compareTo((b['vehicleNumber'] ?? b['vehicle_number'] ?? '').toString());
             break;
           case 1:
-            result = a.equipmentType.compareTo(b.equipmentType);
+            result = (a['type'] ?? a['equipment_type'] ?? '').toString().compareTo((b['type'] ?? b['equipment_type'] ?? '').toString());
             break;
           case 2:
-            result = a.modelName.compareTo(b.modelName);
+            result = (a['model'] ?? a['modelName'] ?? '').toString().compareTo((b['model'] ?? b['modelName'] ?? '').toString());
             break;
           case 3:
-            result = a.docStatus.index.compareTo(b.docStatus.index);
+            result = (a['status'] ?? '').toString().compareTo((b['status'] ?? '').toString());
             break;
           case 4:
-            result = a.registeredAt.compareTo(b.registeredAt);
+            result = (a['createdAt'] ?? a['created_at'] ?? '').toString().compareTo((b['createdAt'] ?? b['created_at'] ?? '').toString());
             break;
           default:
             result = 0;
@@ -307,11 +369,13 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
   }
 
   void _deleteEquipment(int originalIndex) {
+    final eq = _apiEquipments[originalIndex];
+    final name = eq['vehicleNumber'] ?? eq['vehicle_number'] ?? eq['name'] ?? '장비';
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('삭제 확인'),
-        content: Text("'${_equipmentList[originalIndex].vehicleNumber}' 장비를 삭제하시겠습니까?"),
+        content: Text("'$name' 장비를 삭제하시겠습니까?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -319,8 +383,8 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              setState(() => _equipmentList.removeAt(originalIndex));
               Navigator.of(ctx).pop();
+              _deleteEquipmentApi(originalIndex);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
@@ -341,12 +405,28 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 헤더
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              const Text('장비 관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-              const SizedBox(height: 4),
-              Text('등록된 장비 목록을 확인하고 상세 정보를 관리하세요.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('장비 관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+                    const SizedBox(height: 4),
+                    Text('등록된 장비 목록을 확인하고 상세 정보를 관리하세요.', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: _loadEquipments,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('새로고침'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -417,7 +497,39 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
             ),
           ),
           const SizedBox(height: 16),
-          if (_equipmentList.isEmpty)
+          if (_isLoading)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+                  const SizedBox(height: 12),
+                  Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+                  const SizedBox(height: 8),
+                  Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  TextButton(onPressed: _loadEquipments, child: const Text('다시 시도')),
+                ],
+              ),
+            )
+          else if (_apiEquipments.isEmpty)
             _buildEmptyState()
           else if (_filteredList.isEmpty)
             _buildNoResultState()
@@ -472,6 +584,47 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
     );
   }
 
+  String _translateStatus(String? status) {
+    switch (status) {
+      case 'ACTIVE': return '가동중';
+      case 'INACTIVE': return '미가동';
+      case 'MAINTENANCE': return '정비중';
+      case 'DEPLOYED': return '투입중';
+      case 'EXPIRED': return '만료';
+      case 'EXPIRING_SOON': return '만료임박';
+      case 'INCOMPLETE': return '서류미비';
+      default: return status ?? '-';
+    }
+  }
+
+  Color _apiStatusColor(String? status) {
+    switch (status) {
+      case 'ACTIVE':
+      case 'DEPLOYED':
+        return AppColors.success;
+      case 'INACTIVE':
+      case 'EXPIRED':
+        return AppColors.error;
+      case 'MAINTENANCE':
+      case 'EXPIRING_SOON':
+        return const Color(0xFFFF9800);
+      case 'INCOMPLETE':
+        return AppColors.error;
+      default:
+        return AppColors.grey;
+    }
+  }
+
+  String _formatDate(dynamic date) {
+    if (date == null) return '-';
+    try {
+      final dt = DateTime.parse(date.toString());
+      return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return date.toString();
+    }
+  }
+
   Widget _buildEquipmentList() {
     final filtered = _filteredList;
     return Column(
@@ -510,29 +663,40 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
                 DataColumn(label: const Text('차량번호'), onSort: _onSort),
                 DataColumn(label: const Text('장비유형'), onSort: _onSort),
                 DataColumn(label: const Text('모델명'), onSort: _onSort),
-                DataColumn(label: const Text('서류상태'), onSort: _onSort),
+                DataColumn(label: const Text('상태'), onSort: _onSort),
                 DataColumn(label: const Text('등록일'), onSort: _onSort),
                 const DataColumn(label: Text('관리')),
               ],
               rows: List.generate(filtered.length, (i) {
                 final eq = filtered[i];
-                final originalIndex = _equipmentList.indexOf(eq);
+                final originalIndex = _apiEquipments.indexOf(eq);
+                final status = eq['status']?.toString();
                 return DataRow(
-                  selected: _expandedIndex != null && _equipmentList.indexOf(eq) == _expandedIndex,
+                  selected: _expandedIndex != null && originalIndex == _expandedIndex,
                   onSelectChanged: (_) {
                     setState(() {
                       _expandedIndex = _expandedIndex == originalIndex ? null : originalIndex;
                     });
                   },
                   cells: [
-                    DataCell(Text(eq.vehicleNumber,
-                        style: const TextStyle(fontWeight: FontWeight.w600))),
-                    DataCell(Text(eq.equipmentType)),
-                    DataCell(Text(eq.modelName)),
-                    DataCell(_buildDocStatusBadge(eq)),
                     DataCell(Text(
-                      '${eq.registeredAt.year}.${eq.registeredAt.month.toString().padLeft(2, '0')}.${eq.registeredAt.day.toString().padLeft(2, '0')}',
+                      (eq['vehicleNumber'] ?? eq['vehicle_number'] ?? eq['name'] ?? '-').toString(),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     )),
+                    DataCell(Text((eq['type'] ?? eq['equipment_type'] ?? eq['equipmentType'] ?? '-').toString())),
+                    DataCell(Text((eq['model'] ?? eq['modelName'] ?? eq['model_name'] ?? '-').toString())),
+                    DataCell(Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _apiStatusColor(status).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _translateStatus(status),
+                        style: TextStyle(color: _apiStatusColor(status), fontWeight: FontWeight.w600, fontSize: 12),
+                      ),
+                    )),
+                    DataCell(Text(_formatDate(eq['createdAt'] ?? eq['created_at']))),
                     DataCell(
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -568,11 +732,47 @@ class _SupplierEquipmentPageState extends State<SupplierEquipmentPage> {
             ),
           ),
         ),
-        // 상세 패널
+        // 상세 패널 (API data)
         if (_expandedIndex != null &&
-            _expandedIndex! < _equipmentList.length)
-          _buildEquipmentDetail(_equipmentList[_expandedIndex!]),
+            _expandedIndex! < _apiEquipments.length)
+          _buildApiEquipmentDetail(_apiEquipments[_expandedIndex!]),
       ],
+    );
+  }
+
+  Widget _buildApiEquipmentDetail(Map<String, dynamic> eq) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.build_outlined, color: AppColors.primary, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                '${eq['type'] ?? eq['equipment_type'] ?? '-'} - ${eq['vehicleNumber'] ?? eq['vehicle_number'] ?? eq['name'] ?? '-'}',
+                style: AppTextStyles.headlineSmall.copyWith(color: AppColors.primary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow('차량번호', (eq['vehicleNumber'] ?? eq['vehicle_number'] ?? '-').toString()),
+          _buildInfoRow('장비유형', (eq['type'] ?? eq['equipment_type'] ?? '-').toString()),
+          _buildInfoRow('모델명', (eq['model'] ?? eq['modelName'] ?? '-').toString()),
+          _buildInfoRow('제조사', (eq['manufacturer'] ?? '-').toString()),
+          _buildInfoRow('상태', _translateStatus(eq['status']?.toString())),
+          _buildInfoRow('등록일', _formatDate(eq['createdAt'] ?? eq['created_at'])),
+        ],
+      ),
     );
   }
 

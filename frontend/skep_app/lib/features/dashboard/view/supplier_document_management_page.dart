@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 
 class SupplierDocumentManagementPage extends StatefulWidget {
   const SupplierDocumentManagementPage({Key? key}) : super(key: key);
@@ -16,6 +19,8 @@ class _SupplierDocumentManagementPageState
   String _selectedEquipment = '';
   String _selectedPersonnel = '';
   String _bpCompany = '';
+  bool _isLoading = true;
+  String? _error;
 
   final List<String> _submissionTypes = [
     '차량+운전수 세트',
@@ -24,48 +29,10 @@ class _SupplierDocumentManagementPageState
     '인력만',
   ];
 
-  final List<Map<String, String>> _equipmentList = [
-    {'id': 'E001', 'name': '25톤 크레인 (서울12가3456)'},
-    {'id': 'E002', 'name': '50톤 크레인 (경기34나5678)'},
-    {'id': 'E003', 'name': '굴삭기 0.7m3 (인천56다7890)'},
-  ];
-
-  final List<Map<String, String>> _personnelList = [
-    {'id': 'P001', 'name': '김운전 (크레인 운전원)'},
-    {'id': 'P002', 'name': '이기사 (굴삭기 운전원)'},
-    {'id': 'P003', 'name': '박유도 (유도원)'},
-  ];
-
-  final List<Map<String, String>> _sendHistory = [
-    {
-      'date': '2026-03-20',
-      'bp': '현대건설',
-      'type': '차량+운전수 세트',
-      'target': '25톤 크레인 / 김운전',
-      'status': '승인',
-    },
-    {
-      'date': '2026-03-18',
-      'bp': '삼성물산',
-      'type': '차량만',
-      'target': '50톤 크레인',
-      'status': '검토중',
-    },
-    {
-      'date': '2026-03-15',
-      'bp': 'GS건설',
-      'type': '인력만',
-      'target': '박유도 (유도원)',
-      'status': '발송완료',
-    },
-    {
-      'date': '2026-03-10',
-      'bp': '대림산업',
-      'type': '운전수만',
-      'target': '이기사',
-      'status': '반려',
-    },
-  ];
+  List<Map<String, dynamic>> _equipmentList = [];
+  List<Map<String, dynamic>> _personnelList = [];
+  List<Map<String, dynamic>> _expiringDocs = [];
+  List<Map<String, dynamic>> _sendHistory = [];
 
   final List<String> _documentThumbnails = [
     '사업자등록증',
@@ -76,41 +43,161 @@ class _SupplierDocumentManagementPageState
     '건강검진결과',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final dioClient = context.read<DioClient>();
+      final responses = await Future.wait([
+        dioClient.get<dynamic>(ApiEndpoints.documentExpiring),
+        dioClient.get<dynamic>(ApiEndpoints.equipments),
+        dioClient.get<dynamic>(ApiEndpoints.persons),
+      ]);
+
+      // Parse expiring documents
+      final docData = responses[0].data;
+      if (docData is List) {
+        _expiringDocs = docData.cast<Map<String, dynamic>>();
+      } else if (docData is Map && docData['content'] is List) {
+        _expiringDocs = (docData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _expiringDocs = [];
+      }
+
+      // Build send history from expiring docs
+      _sendHistory = _expiringDocs.map((doc) => <String, dynamic>{
+        'date': doc['expiryDate'] ?? doc['createdAt'] ?? '',
+        'bp': doc['bpCompanyName'] ?? '',
+        'type': doc['documentType'] ?? doc['type'] ?? '',
+        'target': doc['ownerName'] ?? doc['equipmentName'] ?? '',
+        'status': doc['status'] ?? '',
+      }).toList();
+
+      // Parse equipment list
+      final equipData = responses[1].data;
+      if (equipData is List) {
+        _equipmentList = equipData.cast<Map<String, dynamic>>();
+      } else if (equipData is Map && equipData['content'] is List) {
+        _equipmentList = (equipData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _equipmentList = [];
+      }
+
+      // Parse personnel list
+      final persData = responses[2].data;
+      if (persData is List) {
+        _personnelList = persData.cast<Map<String, dynamic>>();
+      } else if (persData is Map && persData['content'] is List) {
+        _personnelList = (persData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _personnelList = [];
+      }
+    } catch (e) {
+      _error = e.toString();
+    }
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
   Color _statusColor(String status) {
-    switch (status) {
+    final s = status.toUpperCase();
+    switch (s) {
       case '승인':
+      case 'APPROVED':
+      case 'VALID':
         return AppColors.success;
       case '검토중':
+      case 'PENDING':
+      case 'REVIEWING':
         return AppColors.warning;
       case '발송완료':
+      case 'SENT':
         return AppColors.info;
       case '반려':
+      case 'REJECTED':
+      case 'EXPIRED':
         return AppColors.error;
       default:
         return AppColors.grey;
     }
   }
 
-  void _simulateSendEmail() {
+  String _mapDocStatus(String status) {
+    final s = status.toUpperCase();
+    switch (s) {
+      case 'APPROVED':
+      case 'VALID':
+        return '승인';
+      case 'PENDING':
+      case 'REVIEWING':
+        return '검토중';
+      case 'SENT':
+        return '발송완료';
+      case 'REJECTED':
+        return '반려';
+      case 'EXPIRED':
+        return '만료';
+      default:
+        return status;
+    }
+  }
+
+  Future<void> _sendEmail() async {
     if (_bpCompany.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('BP사를 입력해주세요.')),
       );
       return;
     }
+    // TODO: Connect to email sending endpoint when available
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$_bpCompany에 서류 이메일이 발송되었습니다. (시뮬레이션)')),
+      SnackBar(content: Text('$_bpCompany에 서류 이메일 발송 기능은 준비 중입니다.')),
     );
   }
 
-  void _simulateDownloadPdf() {
+  Future<void> _downloadPdf() async {
+    // TODO: Connect to PDF download endpoint when available
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('PDF 다운로드가 시작되었습니다. (시뮬레이션)')),
+      const SnackBar(content: Text('PDF 다운로드 기능은 준비 중입니다.')),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(48),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null) {
+      return Container(
+        padding: const EdgeInsets.all(48),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: 12),
+              Text('데이터를 불러오는데 실패했습니다', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+              const SizedBox(height: 8),
+              Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey), textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              TextButton(onPressed: _loadData, child: const Text('다시 시도')),
+            ],
+          ),
+        ),
+      );
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -169,7 +256,8 @@ class _SupplierDocumentManagementPageState
                     ),
                     items: _equipmentList
                         .map((e) => DropdownMenuItem(
-                            value: e['id'], child: Text(e['name']!)))
+                            value: (e['id'] ?? '').toString(),
+                            child: Text(e['vehicleNumber'] ?? e['name'] ?? e['id'].toString())))
                         .toList(),
                     onChanged: (v) =>
                         setState(() => _selectedEquipment = v ?? ''),
@@ -192,7 +280,8 @@ class _SupplierDocumentManagementPageState
                     ),
                     items: _personnelList
                         .map((p) => DropdownMenuItem(
-                            value: p['id'], child: Text(p['name']!)))
+                            value: (p['id'] ?? '').toString(),
+                            child: Text(p['name'] ?? p['id'].toString())))
                         .toList(),
                     onChanged: (v) =>
                         setState(() => _selectedPersonnel = v ?? ''),
@@ -248,7 +337,7 @@ class _SupplierDocumentManagementPageState
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: _simulateSendEmail,
+                      onPressed: _sendEmail,
                       icon: const Icon(Icons.email_outlined),
                       label: const Text('이메일 발송'),
                       style: ElevatedButton.styleFrom(
@@ -260,7 +349,7 @@ class _SupplierDocumentManagementPageState
                     ),
                     const SizedBox(width: 12),
                     OutlinedButton.icon(
-                      onPressed: _simulateDownloadPdf,
+                      onPressed: _downloadPdf,
                       icon: const Icon(Icons.picture_as_pdf_outlined),
                       label: const Text('PDF 다운로드'),
                       style: OutlinedButton.styleFrom(
@@ -295,29 +384,32 @@ class _SupplierDocumentManagementPageState
                   DataColumn(label: Text('상태')),
                 ],
                 rows: _sendHistory
-                    .map((h) => DataRow(cells: [
-                          DataCell(Text(h['date']!)),
-                          DataCell(Text(h['bp']!)),
-                          DataCell(Text(h['type']!)),
-                          DataCell(Text(h['target']!)),
-                          DataCell(Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: _statusColor(h['status']!)
-                                  .withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
+                    .map((h) {
+                      final status = _mapDocStatus(h['status']?.toString() ?? '');
+                      return DataRow(cells: [
+                        DataCell(Text(h['date']?.toString() ?? '')),
+                        DataCell(Text(h['bp']?.toString() ?? '')),
+                        DataCell(Text(h['type']?.toString() ?? '')),
+                        DataCell(Text(h['target']?.toString() ?? '')),
+                        DataCell(Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _statusColor(status)
+                                .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              color: _statusColor(status),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
-                            child: Text(
-                              h['status']!,
-                              style: TextStyle(
-                                color: _statusColor(h['status']!),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          )),
-                        ]))
+                          ),
+                        )),
+                      ]);
+                    })
                     .toList(),
               ),
             ),
