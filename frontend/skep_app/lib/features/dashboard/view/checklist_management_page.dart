@@ -79,7 +79,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     });
     try {
       final dioClient = context.read<DioClient>();
-      final response = await dioClient.get<dynamic>('/api/dispatch/checklists/plan/$planId');
+      final response = await dioClient.get<dynamic>(ApiEndpoints.checklists.replaceFirst('{planId}', planId.toString()));
       if (response.statusCode == 200 && response.data != null) {
         _checklist = response.data is Map<String, dynamic> ? response.data : null;
         if (_checklist != null) {
@@ -99,6 +99,29 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
 
     // Also load assignment data
     _loadEquipmentAndPersons();
+  }
+
+  Future<void> _reloadChecklistOnly() async {
+    if (_selectedPlanId == null) return;
+    try {
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>(ApiEndpoints.checklists.replaceFirst('{planId}', _selectedPlanId.toString()));
+      if (response.statusCode == 200 && response.data != null) {
+        _checklist = response.data is Map<String, dynamic> ? response.data : null;
+        if (_checklist != null) {
+          _quotationConfirmed = _checklist!['quotationConfirmed'] == true;
+          _documentsVerified = _checklist!['documentsVerified'] == true;
+          _licenseVerified = _checklist!['licenseVerified'] == true;
+          _safetyInspectionPassed = _checklist!['safetyInspectionPassed'] == true;
+          _healthCheckCompleted = _checklist!['healthCheckCompleted'] == true;
+          _personnelAssigned = _checklist!['personnelAssigned'] == true;
+          _equipmentAssigned = _checklist!['equipmentAssigned'] == true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to reload checklist: $e');
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadEquipmentAndPersons() async {
@@ -124,7 +147,9 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
           _personsList = (data['content'] as List).cast<Map<String, dynamic>>();
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Failed to load equipment/persons: $e');
+    }
     if (mounted) setState(() => _isLoadingAssignment = false);
   }
 
@@ -135,13 +160,14 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     });
     try {
       final dioClient = context.read<DioClient>();
-      final url = '/api/equipment/$equipmentId/current-assignment';
+      final url = ApiEndpoints.equipmentAssign.replaceFirst('{id}', equipmentId.toString()).replaceFirst('/assign', '/current-assignment');
       final response = await dioClient.get<dynamic>(url);
       if (response.statusCode == 200 && response.data != null) {
         _currentAssignment = response.data is Map<String, dynamic> ? response.data : null;
       }
-    } catch (_) {
+    } catch (e) {
       _currentAssignment = null;
+      debugPrint('Failed to load assignment: $e');
     }
     if (mounted) setState(() => _isLoadingCurrentAssignment = false);
   }
@@ -155,7 +181,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     }
     try {
       final dioClient = context.read<DioClient>();
-      final url = '/api/equipment/$_selectedEquipmentId/assign';
+      final url = ApiEndpoints.equipmentAssign.replaceFirst('{id}', _selectedEquipmentId.toString());
       await dioClient.post<dynamic>(url, data: {
         'driverId': _selectedDriverId,
         'guideIds': _selectedGuideIds,
@@ -215,7 +241,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     try {
       final dioClient = context.read<DioClient>();
       await dioClient.put<dynamic>(
-        '/api/dispatch/checklists/$checklistId/update',
+        ApiEndpoints.checklistUpdate.replaceFirst('{id}', checklistId.toString()),
         data: {
           'quotationConfirmed': _quotationConfirmed,
           'documentsVerified': _documentsVerified,
@@ -226,7 +252,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
           'equipmentAssigned': _equipmentAssigned,
         },
       );
-      if (_selectedPlanId != null) await _loadChecklist(_selectedPlanId!);
+      await _reloadChecklistOnly();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('체크리스트가 저장되었습니다'), backgroundColor: AppColors.success),
@@ -249,7 +275,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
     try {
       final dioClient = context.read<DioClient>();
       await dioClient.put<dynamic>(
-        '/api/dispatch/checklists/$checklistId/update',
+        ApiEndpoints.checklistUpdate.replaceFirst('{id}', checklistId.toString()),
         data: {
           'quotationConfirmed': _quotationConfirmed,
           'documentsVerified': _documentsVerified,
@@ -260,7 +286,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
           'equipmentAssigned': _equipmentAssigned,
         },
       );
-      if (_selectedPlanId != null) await _loadChecklist(_selectedPlanId!);
+      await _reloadChecklistOnly();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -311,7 +337,7 @@ class _ChecklistManagementPageState extends State<ChecklistManagementPage> {
                 try {
                   final dioClient = context.read<DioClient>();
                   await dioClient.put<dynamic>(
-                    '/api/dispatch/checklists/$checklistId/override',
+                    ApiEndpoints.checklistOverride.replaceFirst('{id}', checklistId.toString()),
                     data: {'reason': reasonController.text.trim()},
                   );
                   if (mounted) Navigator.of(ctx).pop();

@@ -44,7 +44,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
     });
     try {
       final dioClient = context.read<DioClient>();
-      final response = await dioClient.get<dynamic>('/api/dispatch/quotations/requests');
+      final response = await dioClient.get<dynamic>(ApiEndpoints.quotationRequests);
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         if (data is List) {
@@ -70,7 +70,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
     try {
       final dioClient = context.read<DioClient>();
       // Load all quotations - try the base endpoint
-      final response = await dioClient.get<dynamic>('/api/dispatch/quotations');
+      final response = await dioClient.get<dynamic>(ApiEndpoints.quotations);
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         if (data is List) {
@@ -170,7 +170,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
     showDialog(
       context: context,
       builder: (ctx) {
-        context.read<DioClient>().get<dynamic>('/api/dispatch/sites').then((res) {
+        context.read<DioClient>().get<dynamic>(ApiEndpoints.sites).then((res) {
           if (res.data is List) {
             sites = (res.data as List).cast<Map<String, dynamic>>();
           } else if (res.data is Map && res.data['content'] is List) {
@@ -257,7 +257,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                     try {
                       final dioClient = context.read<DioClient>();
                       await dioClient.post<dynamic>(
-                        '/api/dispatch/quotations/requests',
+                        ApiEndpoints.quotationRequests,
                         data: {
                           'siteId': selectedSiteId,
                           'title': titleController.text.trim(),
@@ -444,7 +444,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                     try {
                       final dioClient = context.read<DioClient>();
                       await dioClient.post<dynamic>(
-                        '/api/dispatch/quotations',
+                        ApiEndpoints.quotations,
                         data: {
                           'requestId': selectedRequestId,
                           'supplierName': supplierController.text.trim(),
@@ -483,7 +483,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
   Future<void> _submitQuotation(int id) async {
     try {
       final dioClient = context.read<DioClient>();
-      await dioClient.put<dynamic>('/api/dispatch/quotations/$id/submit');
+      await dioClient.put<dynamic>(ApiEndpoints.quotationSubmit.replaceFirst('{id}', id.toString()));
       await _loadQuotations();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -502,7 +502,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
   Future<void> _acceptQuotation(int id) async {
     try {
       final dioClient = context.read<DioClient>();
-      await dioClient.put<dynamic>('/api/dispatch/quotations/$id/accept');
+      await dioClient.put<dynamic>(ApiEndpoints.quotationAccept.replaceFirst('{id}', id.toString()));
       await _loadQuotations();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -521,7 +521,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
   Future<void> _rejectQuotation(int id) async {
     try {
       final dioClient = context.read<DioClient>();
-      await dioClient.put<dynamic>('/api/dispatch/quotations/$id/reject');
+      await dioClient.put<dynamic>(ApiEndpoints.quotationReject.replaceFirst('{id}', id.toString()));
       await _loadQuotations();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

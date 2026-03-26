@@ -57,7 +57,7 @@ public class QuotationService {
 
     @Transactional(readOnly = true)
     public List<Quotation> getQuotationsByRequest(UUID requestId) {
-        return quotationRepository.findByRequestId(requestId);
+        return quotationRepository.findByRequestIdWithItems(requestId);
     }
 
     public Quotation submitQuotation(UUID id) {

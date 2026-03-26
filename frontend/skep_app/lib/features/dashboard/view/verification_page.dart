@@ -75,7 +75,7 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
     try {
       final dioClient = context.read<DioClient>();
       final response = await dioClient.post<dynamic>(
-        '/api/documents/verify/driver-license',
+        ApiEndpoints.verifyDriverLicense,
         data: {
           'licenseNumber': _licenseNumberCtrl.text.trim(),
           'name': _licenseNameCtrl.text.trim(),
@@ -105,7 +105,7 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
     try {
       final dioClient = context.read<DioClient>();
       final response = await dioClient.post<dynamic>(
-        '/api/documents/verify/business-registration',
+        ApiEndpoints.verifyBusinessRegistration,
         data: {
           'businessNumber': _bizNumberCtrl.text.trim(),
         },
@@ -134,7 +134,7 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
     try {
       final dioClient = context.read<DioClient>();
       final response = await dioClient.post<dynamic>(
-        '/api/documents/verify/cargo',
+        ApiEndpoints.verifyCargo,
         data: {
           'name': _cargoNameCtrl.text.trim(),
           'birth': _cargoBirthCtrl.text.trim(),
@@ -196,43 +196,52 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
     });
 
     final dioClient = context.read<DioClient>();
+    int completedCount = 0;
 
-    for (int i = 0; i < _allDrivers.length; i++) {
-      final driver = _allDrivers[i];
-      final driverId = driver['id'];
-      final name = driver['name']?.toString() ?? driver['personName']?.toString() ?? '';
-      final licenseNumber = driver['licenseNumber']?.toString() ??
-          driver['driverLicenseNumber']?.toString() ?? '';
+    // Process in chunks of 5 for parallel verification
+    const chunkSize = 5;
+    for (int i = 0; i < _allDrivers.length; i += chunkSize) {
+      final chunk = _allDrivers.sublist(i, (i + chunkSize).clamp(0, _allDrivers.length));
+      await Future.wait(chunk.asMap().entries.map((entry) async {
+        final chunkIndex = entry.key;
+        final globalIndex = i + chunkIndex;
+        final driver = entry.value;
+        final name = driver['name']?.toString() ?? driver['personName']?.toString() ?? '';
+        final licenseNumber = driver['licenseNumber']?.toString() ??
+            driver['driverLicenseNumber']?.toString() ?? '';
 
-      if (name.isEmpty || licenseNumber.isEmpty) {
-        _batchResults[i] = {
-          'result': 'UNKNOWN',
-          'message': '면허번호 또는 이름 정보 없음',
-        };
-        setState(() => _batchCompleted = i + 1);
-        continue;
-      }
-
-      try {
-        final response = await dioClient.post<dynamic>(
-          '/api/documents/verify/driver-license',
-          data: {
-            'licenseNumber': licenseNumber,
-            'name': name,
-          },
-        );
-        if (response.statusCode == 200 && response.data != null) {
-          _batchResults[i] = response.data is Map<String, dynamic>
-              ? response.data as Map<String, dynamic>
-              : {'result': response.data.toString()};
-        } else {
-          _batchResults[i] = {'result': 'UNKNOWN', 'message': 'No response data'};
+        if (name.isEmpty || licenseNumber.isEmpty) {
+          _batchResults[globalIndex] = {
+            'result': 'UNKNOWN',
+            'message': '면허번호 또는 이름 정보 없음',
+          };
+          completedCount++;
+          if (mounted) setState(() => _batchCompleted = completedCount);
+          return;
         }
-      } catch (e) {
-        _batchResults[i] = {'result': 'UNKNOWN', 'message': e.toString()};
-      }
 
-      if (mounted) setState(() => _batchCompleted = i + 1);
+        try {
+          final response = await dioClient.post<dynamic>(
+            ApiEndpoints.verifyDriverLicense,
+            data: {
+              'licenseNumber': licenseNumber,
+              'name': name,
+            },
+          );
+          if (response.statusCode == 200 && response.data != null) {
+            _batchResults[globalIndex] = response.data is Map<String, dynamic>
+                ? response.data as Map<String, dynamic>
+                : {'result': response.data.toString()};
+          } else {
+            _batchResults[globalIndex] = {'result': 'UNKNOWN', 'message': 'No response data'};
+          }
+        } catch (e) {
+          _batchResults[globalIndex] = {'result': 'UNKNOWN', 'message': e.toString()};
+        }
+
+        completedCount++;
+        if (mounted) setState(() => _batchCompleted = completedCount);
+      }));
     }
 
     if (mounted) setState(() => _isBatchVerifying = false);
@@ -262,7 +271,7 @@ class _VerificationPageState extends State<VerificationPage> with SingleTickerPr
     try {
       final dioClient = context.read<DioClient>();
       final response = await dioClient.post<dynamic>(
-        '/api/documents/verify/driver-license',
+        ApiEndpoints.verifyDriverLicense,
         data: {
           'licenseNumber': licenseNumber,
           'name': name,

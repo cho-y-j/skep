@@ -45,6 +45,28 @@ class ApiEndpoints {
   static const String startWork = '/api/dispatch/work-records/{id}/start';
   static const String endWork = '/api/dispatch/work-records/{id}/end';
 
+  // Quotation endpoints
+  static const String quotationRequests = '/api/dispatch/quotations/requests';
+  static const String quotations = '/api/dispatch/quotations';
+  static const String quotationsByRequest = '/api/dispatch/quotations/request/{requestId}';
+  static const String quotationSubmit = '/api/dispatch/quotations/{id}/submit';
+  static const String quotationAccept = '/api/dispatch/quotations/{id}/accept';
+  static const String quotationReject = '/api/dispatch/quotations/{id}/reject';
+
+  // Site endpoints
+  static const String sites = '/api/dispatch/sites';
+  static const String sitesByBp = '/api/dispatch/sites/bp/{bpCompanyId}';
+
+  // Checklist endpoints
+  static const String checklists = '/api/dispatch/checklists/plan/{planId}';
+  static const String checklistUpdate = '/api/dispatch/checklists/{id}/update';
+  static const String checklistOverride = '/api/dispatch/checklists/{id}/override';
+
+  // Verification endpoints
+  static const String verifyDriverLicense = '/api/documents/verify/driver-license';
+  static const String verifyBusinessRegistration = '/api/documents/verify/business-registration';
+  static const String verifyCargo = '/api/documents/verify/cargo';
+
   // Confirmation endpoints
   static const String dailyConfirmations = '/api/dispatch/confirmations/daily';
   static const String monthlyConfirmations = '/api/dispatch/confirmations/monthly';

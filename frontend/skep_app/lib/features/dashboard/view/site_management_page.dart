@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -34,7 +33,7 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
     });
     try {
       final dioClient = context.read<DioClient>();
-      final response = await dioClient.get<dynamic>('/api/dispatch/sites');
+      final response = await dioClient.get<dynamic>(ApiEndpoints.sites);
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         if (data is List) {
@@ -515,7 +514,7 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
                     }
                     try {
                       final dioClient = context.read<DioClient>();
-                      await dioClient.post<dynamic>('/api/dispatch/sites', data: body);
+                      await dioClient.post<dynamic>(ApiEndpoints.sites, data: body);
                       if (mounted) Navigator.of(ctx).pop();
                       await _loadData();
                       if (mounted) {
