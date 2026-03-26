@@ -48,26 +48,43 @@ class _MatchingResponsePageState extends State<MatchingResponsePage> {
         }
         _requests = items.map((item) {
           final m = item as Map<String, dynamic>;
+          final statusStr = (m['status'] ?? 'NEW').toString().toUpperCase();
+          String displayStatus;
+          switch (statusStr) {
+            case 'NEW':
+            case 'PENDING':
+              displayStatus = '신규';
+              break;
+            case 'ACCEPTED':
+            case 'APPROVED':
+              displayStatus = '수락';
+              break;
+            case 'REJECTED':
+            case 'DECLINED':
+              displayStatus = '거절';
+              break;
+            case 'QUOTE_SENT':
+              displayStatus = '견적발송';
+              break;
+            default:
+              displayStatus = statusStr;
+          }
           return _IncomingRequest(
             id: (m['id'] ?? '').toString(),
-            bpCompany: (m['bpCompany'] ?? m['companyName'] ?? m['requesterName'] ?? '-').toString(),
-            date: (m['date'] ?? m['requestDate'] ?? '-').toString(),
-            time: (m['time'] ?? m['workTime'] ?? '-').toString(),
-            equipmentSpec: (m['equipmentSpec'] ?? m['equipmentType'] ?? '-').toString(),
-            site: (m['site'] ?? m['location'] ?? '-').toString(),
-            matchedEquipment: (m['matchedEquipment'] ?? m['vehicleNumber'] ?? '-').toString(),
-            matchedOperator: (m['matchedOperator'] ?? m['operatorName'] ?? '-').toString(),
-            docsOk: m['docsOk'] == true,
-            inspectionOk: m['inspectionOk'] == true,
-            licenseOk: m['licenseOk'] == true,
-            educationOk: m['educationOk'] == true,
-            status: (m['status'] ?? 'NEW').toString() == 'NEW' ? '신규' :
-                    (m['status'] ?? '').toString() == 'ACCEPTED' ? '수락' :
-                    (m['status'] ?? '').toString() == 'REJECTED' ? '거절' :
-                    (m['status'] ?? '').toString() == 'QUOTE_SENT' ? '견적발송' :
-                    (m['status'] ?? '신규').toString(),
-            note: m['note']?.toString(),
-            rejectReason: m['rejectReason']?.toString(),
+            bpCompany: (m['bpCompanyName'] ?? m['bpCompany'] ?? m['companyName'] ?? m['requesterName'] ?? '-').toString(),
+            date: (m['requestDate'] ?? m['date'] ?? m['workDate'] ?? '-').toString(),
+            time: (m['workTime'] ?? m['time'] ?? m['startTime'] ?? '-').toString(),
+            equipmentSpec: (m['equipmentTypeName'] ?? m['equipmentSpec'] ?? m['equipmentType'] ?? '-').toString(),
+            site: (m['siteName'] ?? m['site'] ?? m['location'] ?? '-').toString(),
+            matchedEquipment: (m['vehicleNumber'] ?? m['matchedEquipment'] ?? m['equipmentName'] ?? '-').toString(),
+            matchedOperator: (m['operatorName'] ?? m['matchedOperator'] ?? m['driverName'] ?? '-').toString(),
+            docsOk: m['docsOk'] == true || m['documentComplete'] == true,
+            inspectionOk: m['inspectionOk'] == true || m['inspectionComplete'] == true,
+            licenseOk: m['licenseOk'] == true || m['licenseValid'] == true,
+            educationOk: m['educationOk'] == true || m['educationComplete'] == true,
+            status: displayStatus,
+            note: (m['note'] ?? m['remarks'] ?? m['memo'])?.toString(),
+            rejectReason: (m['rejectReason'] ?? m['rejectionReason'])?.toString(),
           );
         }).toList();
       }

@@ -23,6 +23,13 @@ class AppRouter {
     redirect: (context, state) {
       final authState = context.read<AuthBloc>().state;
 
+      // While auth is still initializing (e.g. on page refresh),
+      // don't redirect - let the BlocListener in App handle navigation
+      // once AuthStarted finishes restoring from SecureStorage.
+      if (authState is AuthInitial || authState is AuthLoading) {
+        return null;
+      }
+
       if (authState is AuthAuthenticated) {
         if (state.matchedLocation == '/login' ||
             state.matchedLocation == '/register') {

@@ -108,6 +108,17 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('새로고침'),
                 style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.white,
+                  foregroundColor: AppColors.greyDark,
+                  side: const BorderSide(color: AppColors.border),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _showAddEquipmentDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('장비 추가'),
+                style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.white,
                 ),
@@ -126,6 +137,109 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showAddEquipmentDialog() {
+    final vehicleNumberController = TextEditingController();
+    final modelNameController = TextEditingController();
+    final manufacturerController = TextEditingController();
+    String selectedType = '';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('장비 추가'),
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: vehicleNumberController,
+                        decoration: const InputDecoration(
+                          labelText: '차량번호',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: modelNameController,
+                        decoration: const InputDecoration(
+                          labelText: '모델명',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: manufacturerController,
+                        decoration: const InputDecoration(
+                          labelText: '제조사',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        decoration: InputDecoration(
+                          labelText: '장비 유형',
+                          border: const OutlineInputBorder(),
+                          hintText: '예: 타워크레인, 굴착기',
+                        ),
+                        onChanged: (v) => selectedType = v,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('취소'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (vehicleNumberController.text.trim().isEmpty) return;
+                    try {
+                      final dioClient = context.read<DioClient>();
+                      await dioClient.post<dynamic>(
+                        ApiEndpoints.equipments,
+                        data: {
+                          'vehicleNumber': vehicleNumberController.text.trim(),
+                          'modelName': modelNameController.text.trim(),
+                          'manufacturer': manufacturerController.text.trim(),
+                          'equipmentType': selectedType.trim(),
+                        },
+                      );
+                      if (mounted) Navigator.of(ctx).pop();
+                      await _loadEquipments();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('장비가 추가되었습니다'), backgroundColor: AppColors.success),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('장비 추가 실패: $e'), backgroundColor: AppColors.error),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                  ),
+                  child: const Text('저장'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -200,12 +314,12 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
           final status = eq['status']?.toString();
           return DataRow(
             cells: [
-              DataCell(Text(eq['name']?.toString() ?? eq['equipment_name']?.toString() ?? '-')),
-              DataCell(Text(eq['type']?.toString() ?? eq['equipment_type']?.toString() ?? '-')),
+              DataCell(Text(eq['vehicleNumber']?.toString() ?? eq['name']?.toString() ?? eq['equipment_name']?.toString() ?? '-')),
+              DataCell(Text(eq['equipmentTypeName']?.toString() ?? eq['equipmentType']?.toString() ?? eq['type']?.toString() ?? '-')),
               DataCell(Text(
-                '${eq['model']?.toString() ?? eq['manufacturer']?.toString() ?? '-'}',
+                '${eq['modelName']?.toString() ?? eq['model']?.toString() ?? '-'} / ${eq['manufacturer']?.toString() ?? '-'}',
               )),
-              DataCell(Text(eq['supplier_name']?.toString() ?? eq['companyName']?.toString() ?? '-')),
+              DataCell(Text(eq['companyName']?.toString() ?? eq['supplier_name']?.toString() ?? '-')),
               DataCell(
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

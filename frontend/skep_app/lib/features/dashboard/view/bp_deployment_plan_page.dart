@@ -213,14 +213,27 @@ class _BpDeploymentPlanPageState extends State<BpDeploymentPlanPage> {
             onPressed: () async {
               Navigator.pop(ctx);
               try {
+                // Parse period "YYYY-MM-DD ~ YYYY-MM-DD" into startDate/endDate
+                String? startDate;
+                String? endDate;
+                if (period.contains('~')) {
+                  final parts = period.split('~').map((s) => s.trim()).toList();
+                  if (parts.length == 2) {
+                    startDate = parts[0];
+                    endDate = parts[1];
+                  }
+                }
                 final dioClient = context.read<DioClient>();
                 await dioClient.post<dynamic>(
-                  '/api/dispatch/quotations/requests',
+                  ApiEndpoints.quotationRequests,
                   data: {
                     'equipmentType': equipType,
-                    'quantity': qty,
-                    'period': period,
+                    'quantity': int.tryParse(qty) ?? 1,
+                    'startDate': startDate ?? period,
+                    'endDate': endDate,
                     'location': location,
+                    'title': '$equipType ${qty}대 요청',
+                    'description': '현장: $location',
                   },
                 );
                 ScaffoldMessenger.of(context).showSnackBar(

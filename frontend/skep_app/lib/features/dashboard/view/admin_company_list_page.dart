@@ -140,6 +140,9 @@ class _AdminCompanyListPageState extends State<AdminCompanyListPage> {
     final nameController = TextEditingController();
     final bizNoController = TextEditingController();
     final ceoController = TextEditingController();
+    final phoneController = TextEditingController();
+    final emailController = TextEditingController();
+    final addressController = TextEditingController();
     String selectedType = 'EQUIPMENT_SUPPLIER';
 
     showDialog(
@@ -175,6 +178,34 @@ class _AdminCompanyListPageState extends State<AdminCompanyListPage> {
                         controller: ceoController,
                         decoration: const InputDecoration(
                           labelText: '대표자',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: phoneController,
+                        decoration: const InputDecoration(
+                          labelText: '연락처',
+                          border: OutlineInputBorder(),
+                          hintText: '02-0000-0000',
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: emailController,
+                        decoration: const InputDecoration(
+                          labelText: '이메일',
+                          border: OutlineInputBorder(),
+                          hintText: 'example@company.com',
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: '주소',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -215,6 +246,9 @@ class _AdminCompanyListPageState extends State<AdminCompanyListPage> {
                           'name': nameController.text.trim(),
                           'businessNumber': bizNoController.text.trim(),
                           'representative': ceoController.text.trim(),
+                          'phone': phoneController.text.trim(),
+                          'email': emailController.text.trim(),
+                          'address': addressController.text.trim(),
                           'companyType': selectedType,
                         },
                       );

@@ -13,17 +13,14 @@ class SettlementDetailPage extends StatefulWidget {
 
 class _SettlementDetailPageState extends State<SettlementDetailPage> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
-  String _selectedBP = '강남 건설 BP';
+  String _selectedBP = '';
   final _numberFormat = NumberFormat('#,###');
   bool _isLoading = true;
   String? _error;
   Map<String, dynamic>? _apiSettlement;
 
-  final List<String> _bpList = [
-    '강남 건설 BP',
-    '송파 건설 BP',
-    '성남 건설 BP',
-  ];
+  List<String> _bpList = [];
+  bool _bpListLoaded = false;
 
   // 단가 (can be overridden by API)
   int _dayRate = 850000;
@@ -35,7 +32,45 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettlement());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadBpListAndSettlement());
+  }
+
+  Future<void> _loadBpListAndSettlement() async {
+    if (!_bpListLoaded) {
+      try {
+        final dioClient = context.read<DioClient>();
+        final response = await dioClient.get<dynamic>(
+          ApiEndpoints.companiesByType.replaceAll('{type}', 'BP_COMPANY'),
+        );
+        if (response.statusCode == 200 && response.data != null) {
+          final data = response.data;
+          List<dynamic> items = [];
+          if (data is List) {
+            items = data;
+          } else if (data is Map && data['companies'] is List) {
+            items = data['companies'] as List;
+          } else if (data is Map && data['content'] is List) {
+            items = data['content'] as List;
+          }
+          _bpList = items.map((bp) {
+            final m = bp as Map<String, dynamic>;
+            return (m['name'] ?? m['companyName'] ?? '').toString();
+          }).where((name) => name.isNotEmpty).toList();
+        }
+      } catch (_) {
+        // Fallback
+        _bpList = ['강남 건설 BP', '송파 건설 BP', '성남 건설 BP'];
+      }
+      if (_bpList.isEmpty) {
+        _bpList = ['강남 건설 BP', '송파 건설 BP', '성남 건설 BP'];
+      }
+      _bpListLoaded = true;
+      if (_selectedBP.isEmpty && _bpList.isNotEmpty) {
+        _selectedBP = _bpList.first;
+      }
+      if (mounted) setState(() {});
+    }
+    await _loadSettlement();
   }
 
   Future<void> _loadSettlement() async {
@@ -153,7 +188,7 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
                         setState(() {
                           _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
                         });
-                        _loadSettlement();
+                        _loadBpListAndSettlement();
                       },
                     ),
                     Text(
@@ -166,7 +201,7 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
                         setState(() {
                           _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
                         });
-                        _loadSettlement();
+                        _loadBpListAndSettlement();
                       },
                     ),
                   ],
@@ -175,7 +210,7 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
                 SizedBox(
                   width: 200,
                   child: DropdownButtonFormField<String>(
-                    value: _selectedBP,
+                    value: _bpList.contains(_selectedBP) ? _selectedBP : (_bpList.isNotEmpty ? _bpList.first : null),
                     decoration: InputDecoration(
                       labelText: 'BP사',
                       labelStyle: const TextStyle(fontSize: 13),
@@ -190,7 +225,7 @@ class _SettlementDetailPageState extends State<SettlementDetailPage> {
                     items: _bpList.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
                     onChanged: (v) {
                       setState(() => _selectedBP = v ?? _selectedBP);
-                      _loadSettlement();
+                      _loadBpListAndSettlement();
                     },
                   ),
                 ),

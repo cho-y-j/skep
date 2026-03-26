@@ -201,6 +201,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             obscureText: true,
                             errorText: _passwordError,
                             readOnly: isLoading,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: isLoading ? null : (_) => _handleLogin(),
                           ),
                           const SizedBox(height: 8),
                           Align(

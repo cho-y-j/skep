@@ -21,20 +21,37 @@ class _CompanyEmployeePageState extends State<CompanyEmployeePage> {
   @override
   void initState() {
     super.initState();
-    _loadEmployees();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadEmployees());
   }
 
   Future<void> _loadEmployees() async {
     setState(() => _isLoading = true);
     try {
-      // In a real app, fetch from API
-      // final dioClient = context.read<DioClient>();
-      // final response = await dioClient.get('/api/companies/employees');
-      // For now, use empty list as placeholder
-      await Future.delayed(const Duration(milliseconds: 300));
-      setState(() {
-        _isLoading = false;
-      });
+      final dioClient = context.read<DioClient>();
+      final response = await dioClient.get<dynamic>('/api/auth/companies/employees');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        List<dynamic> items = [];
+        if (data is List) {
+          items = data;
+        } else if (data is Map && data['content'] is List) {
+          items = data['content'] as List;
+        } else if (data is Map && data['employees'] is List) {
+          items = data['employees'] as List;
+        }
+        _employees = items.map((item) {
+          final m = item as Map<String, dynamic>;
+          return _Employee(
+            name: (m['name'] ?? m['userName'] ?? '-').toString(),
+            email: (m['email'] ?? '-').toString(),
+            position: (m['position'] ?? m['role'] ?? '-').toString(),
+            phone: (m['phone'] ?? m['phoneNumber'] ?? '-').toString(),
+            status: _mapStatus(m['status']?.toString()),
+            createdAt: _parseDate(m['createdAt'] ?? m['joinDate']),
+          );
+        }).toList();
+      }
+      setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -45,6 +62,29 @@ class _CompanyEmployeePageState extends State<CompanyEmployeePage> {
           ),
         );
       }
+    }
+  }
+
+  String _mapStatus(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'ACTIVE':
+        return '활성';
+      case 'INACTIVE':
+      case 'SUSPENDED':
+        return '비활성';
+      case 'PENDING':
+        return '대기';
+      default:
+        return status ?? '활성';
+    }
+  }
+
+  DateTime _parseDate(dynamic date) {
+    if (date == null) return DateTime.now();
+    try {
+      return DateTime.parse(date.toString());
+    } catch (_) {
+      return DateTime.now();
     }
   }
 

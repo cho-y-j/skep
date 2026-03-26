@@ -18,6 +18,7 @@ class AppTextField extends StatefulWidget {
   final TextInputAction textInputAction;
   final Function()? onTap;
   final bool readOnly;
+  final ValueChanged<String>? onFieldSubmitted;
 
   const AppTextField({
     Key? key,
@@ -36,6 +37,7 @@ class AppTextField extends StatefulWidget {
     this.textInputAction = TextInputAction.next,
     this.onTap,
     this.readOnly = false,
+    this.onFieldSubmitted,
   }) : super(key: key);
 
   @override
@@ -70,6 +72,7 @@ class _AppTextFieldState extends State<AppTextField> {
           maxLength: widget.maxLength,
           validator: widget.validator,
           textInputAction: widget.textInputAction,
+          onFieldSubmitted: widget.onFieldSubmitted,
           onTap: widget.onTap,
           readOnly: widget.readOnly,
           decoration: InputDecoration(

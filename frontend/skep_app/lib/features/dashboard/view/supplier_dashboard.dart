@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
+import 'package:skep_app/core/constants/api_endpoints.dart';
+import 'package:skep_app/core/network/dio_client.dart';
 import 'package:skep_app/core/widgets/sidebar_layout.dart';
 import 'package:skep_app/features/auth/bloc/auth_bloc.dart';
 import 'package:skep_app/features/auth/bloc/auth_event.dart';
@@ -443,20 +445,83 @@ class _SupplierDashboardState extends State<SupplierDashboard> {
 }
 
 /// 공급사 홈 페이지 콘텐츠
-class _SupplierHome extends StatelessWidget {
+class _SupplierHome extends StatefulWidget {
   final void Function(String menuId)? onNavigate;
   const _SupplierHome({this.onNavigate});
 
+  @override
+  State<_SupplierHome> createState() => _SupplierHomeState();
+}
+
+class _SupplierHomeState extends State<_SupplierHome> {
   static const _darkText = Color(0xFF1E293B);
   static const _pageBg = Color(0xFFF8FAFC);
   static const _cardShadow = [
     BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))
   ];
 
+  int _eqCount = 0;
+  int _pCount = 0;
+  int _deployCount = 0;
+  bool _countsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCounts());
+  }
+
+  Future<void> _loadCounts() async {
+    try {
+      final dioClient = context.read<DioClient>();
+      final responses = await Future.wait([
+        dioClient.get<dynamic>(ApiEndpoints.equipments),
+        dioClient.get<dynamic>(ApiEndpoints.persons),
+        dioClient.get<dynamic>(ApiEndpoints.deploymentPlans),
+      ]);
+
+      // Equipment count
+      final eqData = responses[0].data;
+      if (eqData is List) {
+        _eqCount = eqData.length;
+      } else if (eqData is Map && eqData['content'] is List) {
+        _eqCount = (eqData['content'] as List).length;
+      } else if (eqData is Map && eqData['totalElements'] != null) {
+        _eqCount = (eqData['totalElements'] as num).toInt();
+      }
+
+      // Personnel count
+      final pData = responses[1].data;
+      if (pData is List) {
+        _pCount = pData.length;
+      } else if (pData is Map && pData['content'] is List) {
+        _pCount = (pData['content'] as List).length;
+      } else if (pData is Map && pData['totalElements'] != null) {
+        _pCount = (pData['totalElements'] as num).toInt();
+      }
+
+      // Deployment count
+      final dData = responses[2].data;
+      if (dData is List) {
+        _deployCount = dData.length;
+      } else if (dData is Map && dData['content'] is List) {
+        _deployCount = (dData['content'] as List).length;
+      } else if (dData is Map && dData['totalElements'] != null) {
+        _deployCount = (dData['totalElements'] as num).toInt();
+      }
+
+      _countsLoaded = true;
+    } catch (_) {
+      // Keep defaults
+    }
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    final eqCount = EquipmentListStore.instance.equipmentList.length;
-    final pCount = PersonnelListStore.instance.personnelList.length;
+    final eqCount = _countsLoaded ? _eqCount : EquipmentListStore.instance.equipmentList.length;
+    final pCount = _countsLoaded ? _pCount : PersonnelListStore.instance.personnelList.length;
+    final deployCount = _countsLoaded ? _deployCount : 0;
 
     return Container(
       color: _pageBg,
@@ -487,9 +552,9 @@ class _SupplierHome extends StatelessWidget {
                   crossAxisSpacing: 16,
                   childAspectRatio: 1.6,
                   children: [
-                    _buildClickableSummaryCard('내 장비', '${eqCount > 0 ? eqCount : 8}대', Icons.build_outlined, AppColors.primary, '가동 중 5대', () => onNavigate?.call('equipment_mgmt')),
-                    _buildClickableSummaryCard('등록 인력', '${pCount > 0 ? pCount : 15}명', Icons.people_outlined, const Color(0xFF16A34A), '투입 가능 10명', () => onNavigate?.call('personnel_mgmt')),
-                    _buildClickableSummaryCard('투입 중', '5건', Icons.assignment_outlined, const Color(0xFFD97706), '이번 주 +1건', () => onNavigate?.call('deployment')),
+                    _buildClickableSummaryCard('내 장비', '${eqCount}대', Icons.build_outlined, AppColors.primary, '', () => widget.onNavigate?.call('equipment_mgmt')),
+                    _buildClickableSummaryCard('등록 인력', '${pCount}명', Icons.people_outlined, const Color(0xFF16A34A), '', () => widget.onNavigate?.call('personnel_mgmt')),
+                    _buildClickableSummaryCard('투입 중', '${deployCount}건', Icons.assignment_outlined, const Color(0xFFD97706), '', () => widget.onNavigate?.call('deployment')),
                   ],
                 );
               },
@@ -552,9 +617,9 @@ class _SupplierHome extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
-                _buildClickableQuickAction(Icons.add_circle_outline, '빠른 장비 등록', AppColors.primary, () => onNavigate?.call('equipment_reg')),
-                _buildClickableQuickAction(Icons.person_add_outlined, '빠른 인력 등록', const Color(0xFF16A34A), () => onNavigate?.call('personnel_reg')),
-                _buildClickableQuickAction(Icons.upload_file_outlined, '서류 업로드', const Color(0xFF7C3AED), () => onNavigate?.call('documents')),
+                _buildClickableQuickAction(Icons.add_circle_outline, '빠른 장비 등록', AppColors.primary, () => widget.onNavigate?.call('equipment_reg')),
+                _buildClickableQuickAction(Icons.person_add_outlined, '빠른 인력 등록', const Color(0xFF16A34A), () => widget.onNavigate?.call('personnel_reg')),
+                _buildClickableQuickAction(Icons.upload_file_outlined, '서류 업로드', const Color(0xFF7C3AED), () => widget.onNavigate?.call('documents')),
               ],
             ),
             const SizedBox(height: 28),

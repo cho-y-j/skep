@@ -31,6 +31,7 @@ class _SupplierDocumentManagementPageState
 
   List<Map<String, dynamic>> _equipmentList = [];
   List<Map<String, dynamic>> _personnelList = [];
+  List<Map<String, dynamic>> _bpCompanyList = [];
   List<Map<String, dynamic>> _expiringDocs = [];
   List<Map<String, dynamic>> _sendHistory = [];
 
@@ -60,6 +61,7 @@ class _SupplierDocumentManagementPageState
         dioClient.get<dynamic>(ApiEndpoints.documentExpiring),
         dioClient.get<dynamic>(ApiEndpoints.equipments),
         dioClient.get<dynamic>(ApiEndpoints.persons),
+        dioClient.get<dynamic>(ApiEndpoints.companiesByType.replaceAll('{type}', 'BP_COMPANY')),
       ]);
 
       // Parse expiring documents
@@ -99,6 +101,18 @@ class _SupplierDocumentManagementPageState
         _personnelList = (persData['content'] as List).cast<Map<String, dynamic>>();
       } else {
         _personnelList = [];
+      }
+
+      // Parse BP company list
+      final bpData = responses[3].data;
+      if (bpData is List) {
+        _bpCompanyList = bpData.cast<Map<String, dynamic>>();
+      } else if (bpData is Map && bpData['companies'] is List) {
+        _bpCompanyList = (bpData['companies'] as List).cast<Map<String, dynamic>>();
+      } else if (bpData is Map && bpData['content'] is List) {
+        _bpCompanyList = (bpData['content'] as List).cast<Map<String, dynamic>>();
+      } else {
+        _bpCompanyList = [];
       }
     } catch (e) {
       _error = e.toString();
@@ -255,9 +269,16 @@ class _SupplierDocumentManagementPageState
                           EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
                     items: _equipmentList
-                        .map((e) => DropdownMenuItem(
-                            value: (e['id'] ?? '').toString(),
-                            child: Text(e['vehicleNumber'] ?? e['name'] ?? e['id'].toString())))
+                        .map((e) {
+                          final id = (e['id'] ?? '').toString();
+                          final vehicleNum = e['vehicleNumber']?.toString() ?? '';
+                          final modelName = e['modelName']?.toString() ?? e['name']?.toString() ?? '';
+                          final label = vehicleNum.isNotEmpty ? vehicleNum : (modelName.isNotEmpty ? modelName : id);
+                          return DropdownMenuItem(
+                            value: id,
+                            child: Text(label),
+                          );
+                        })
                         .toList(),
                     onChanged: (v) =>
                         setState(() => _selectedEquipment = v ?? ''),
@@ -288,17 +309,27 @@ class _SupplierDocumentManagementPageState
                   ),
                   const SizedBox(height: 16),
                 ],
-                // BP사 입력
+                // BP사 선택
                 Text('BP사', style: AppTextStyles.titleMedium),
                 const SizedBox(height: 8),
-                TextFormField(
+                DropdownButtonFormField<String>(
+                  value: _bpCompany.isEmpty ? null : _bpCompany,
+                  hint: const Text('BP사를 선택하세요'),
                   decoration: const InputDecoration(
                     border: OutlineInputBorder(),
-                    hintText: 'BP사명 입력 (추후 API 연동)',
                     contentPadding:
                         EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
-                  onChanged: (v) => _bpCompany = v,
+                  items: _bpCompanyList
+                      .map((bp) {
+                        final name = bp['name']?.toString() ?? bp['companyName']?.toString() ?? '';
+                        return DropdownMenuItem(
+                          value: name,
+                          child: Text(name),
+                        );
+                      })
+                      .toList(),
+                  onChanged: (v) => setState(() => _bpCompany = v ?? ''),
                 ),
                 const SizedBox(height: 16),
                 // 서류 패키지 썸네일

@@ -72,9 +72,10 @@ class ApiEndpoints {
   static const String monthlyConfirmations = '/api/dispatch/confirmations/monthly';
 
   // Inspection endpoints
-  static const String safetyInspections = '/api/inspection/safety';
+  static const String safetyInspections = '/api/inspection/safety/inspections';
   static const String safetyInspection = '/api/inspection/safety/{id}';
-  static const String maintenanceInspections = '/api/inspection/maintenance';
+  static const String safetyInspectionByEquipment = '/api/inspection/safety/equipment/{id}';
+  static const String maintenanceInspections = '/api/inspection/maintenance/inspections';
   static const String maintenanceInspection = '/api/inspection/maintenance/{id}';
   static const String inspectionItems = '/api/inspection/items';
 

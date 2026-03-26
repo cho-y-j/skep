@@ -109,7 +109,7 @@ class _AttendancePageState extends State<AttendancePage> {
       final dioClient = context.read<DioClient>();
       final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
       final response = await dioClient.get<dynamic>(
-        ApiEndpoints.workRecords,
+        ApiEndpoints.dailyRosters,
         queryParameters: {'date': dateStr},
       );
       if (response.statusCode == 200 && response.data != null) {

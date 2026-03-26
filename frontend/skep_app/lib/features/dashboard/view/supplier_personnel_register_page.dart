@@ -260,8 +260,9 @@ class _SupplierPersonnelRegisterPageState
 
   Future<void> _runVerification(
       String docName, DocumentType docType, Uint8List fileBytes) async {
+    if (_uploadedDocs[docName] == null) return;
     setState(() {
-      _uploadedDocs[docName]!.verificationStatus =
+      _uploadedDocs[docName]?.verificationStatus =
           PersonnelVerificationStatus.verifying;
     });
 
@@ -283,7 +284,7 @@ class _SupplierPersonnelRegisterPageState
           _resetVerifyStatus(docName);
           return;
         }
-        final resp = await dio.post('$verifyBaseUrl/api/verify/rims/license',
+        final resp = await dio.post('$verifyBaseUrl${ApiEndpoints.verifyDriverLicense}',
             data: {
               'f_license_no': info['f_license_no'],
               'f_resident_name': info['f_resident_name'],
@@ -303,7 +304,7 @@ class _SupplierPersonnelRegisterPageState
           _resetVerifyStatus(docName);
           return;
         }
-        final resp = await dio.post('$verifyBaseUrl/api/verify/cargo',
+        final resp = await dio.post('$verifyBaseUrl${ApiEndpoints.verifyCargo}',
             data: info,
             options: Options(
                 headers: {'Content-Type': 'application/json'},
@@ -312,23 +313,23 @@ class _SupplierPersonnelRegisterPageState
       } else if (provider.contains('안전보건') || provider.contains('산업안전')) {
         final formData = FormData.fromMap({
           'image': MultipartFile.fromBytes(fileBytes,
-              filename: _uploadedDocs[docName]!.fileName ?? 'doc.jpg'),
+              filename: _uploadedDocs[docName]?.fileName ?? 'doc.jpg'),
         });
-        final resp = await dio.post('$verifyBaseUrl/api/verify/kosha',
+        final resp = await dio.post('$verifyBaseUrl/api/documents/verify/kosha',
             data: formData,
             options: Options(receiveTimeout: const Duration(seconds: 15)));
         _setVerifyResult(docName, resp.data);
       } else {
         if (!mounted) return;
         setState(() {
-          _uploadedDocs[docName]!.verificationStatus =
+          _uploadedDocs[docName]?.verificationStatus =
               PersonnelVerificationStatus.verified;
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _uploadedDocs[docName]!.verificationStatus =
+        _uploadedDocs[docName]?.verificationStatus =
             PersonnelVerificationStatus.failed;
       });
     }
@@ -337,7 +338,7 @@ class _SupplierPersonnelRegisterPageState
   void _resetVerifyStatus(String docName) {
     if (!mounted) return;
     setState(() {
-      _uploadedDocs[docName]!.verificationStatus =
+      _uploadedDocs[docName]?.verificationStatus =
           PersonnelVerificationStatus.pending;
     });
   }
@@ -347,7 +348,7 @@ class _SupplierPersonnelRegisterPageState
     final data = responseData as Map<String, dynamic>;
     final result = data['result'] as String? ?? 'UNKNOWN';
     setState(() {
-      _uploadedDocs[docName]!.verificationStatus = result == 'VALID'
+      _uploadedDocs[docName]?.verificationStatus = result == 'VALID'
           ? PersonnelVerificationStatus.verified
           : PersonnelVerificationStatus.failed;
     });

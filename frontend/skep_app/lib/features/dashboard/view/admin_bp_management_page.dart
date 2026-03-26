@@ -97,6 +97,8 @@ class _AdminBpManagementPageState extends State<AdminBpManagementPage> {
     final ceoController = TextEditingController();
     final managerController = TextEditingController();
     final contactController = TextEditingController();
+    final emailController = TextEditingController();
+    final addressController = TextEditingController();
 
     showDialog(
       context: context,
@@ -132,6 +134,18 @@ class _AdminBpManagementPageState extends State<AdminBpManagementPage> {
                   TextField(
                     controller: contactController,
                     decoration: const InputDecoration(labelText: '연락처', border: OutlineInputBorder()),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: '이메일', border: OutlineInputBorder(), hintText: 'example@company.com'),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: addressController,
+                    decoration: const InputDecoration(labelText: '주소', border: OutlineInputBorder()),
                   ),
                 ],
               ),
@@ -155,6 +169,9 @@ class _AdminBpManagementPageState extends State<AdminBpManagementPage> {
                       'representative': ceoController.text.trim(),
                       'companyType': 'BP_COMPANY',
                       'phone': contactController.text.trim(),
+                      'email': emailController.text.trim(),
+                      'address': addressController.text.trim(),
+                      'manager': managerController.text.trim(),
                     },
                   );
                   if (mounted) Navigator.of(ctx).pop();
