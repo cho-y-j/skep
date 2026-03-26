@@ -16,6 +16,9 @@ import 'package:skep_app/features/dashboard/view/matching_response_page.dart';
 import 'package:skep_app/features/dashboard/view/attendance_page.dart';
 import 'package:skep_app/features/dashboard/view/maintenance_check_page.dart';
 import 'package:skep_app/features/dashboard/view/settlement_detail_page.dart';
+import 'package:skep_app/features/dashboard/view/document_preview_page.dart';
+import 'package:skep_app/features/dashboard/view/verification_page.dart';
+import 'package:skep_app/features/dashboard/view/quotation_management_page.dart';
 import 'package:skep_app/features/dashboard/view/placeholder_page.dart';
 
 class SupplierDashboard extends StatefulWidget {
@@ -90,9 +93,24 @@ class _SupplierDashboardState extends State<SupplierDashboard> {
       label: '정산/거래명세서',
     ),
     SidebarMenuItem(
+      id: 'quotations',
+      icon: Icons.request_quote_outlined,
+      label: '견적 관리',
+    ),
+    SidebarMenuItem(
       id: 'employees',
       icon: Icons.badge_outlined,
       label: '직원 관리',
+    ),
+    SidebarMenuItem(
+      id: 'document_preview',
+      icon: Icons.preview_outlined,
+      label: '서류 미리보기',
+    ),
+    SidebarMenuItem(
+      id: 'verification',
+      icon: Icons.verified_outlined,
+      label: '검증 관리',
     ),
   ];
 
@@ -149,8 +167,14 @@ class _SupplierDashboardState extends State<SupplierDashboard> {
         return const MaintenanceCheckPage();
       case 'settlement':
         return const SettlementDetailPage();
+      case 'quotations':
+        return const QuotationManagementPage();
       case 'employees':
         return const CompanyEmployeePage();
+      case 'document_preview':
+        return const DocumentPreviewPage();
+      case 'verification':
+        return const VerificationPage();
       default:
         return const _SupplierHome();
     }
@@ -180,8 +204,14 @@ class _SupplierDashboardState extends State<SupplierDashboard> {
         return '정비 점검';
       case 'settlement':
         return '정산/거래명세서';
+      case 'quotations':
+        return '견적 관리';
       case 'employees':
         return '직원 관리';
+      case 'document_preview':
+        return '서류 미리보기';
+      case 'verification':
+        return '검증 관리';
       default:
         return '장비공급사 대시보드';
     }

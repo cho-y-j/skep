@@ -13,6 +13,9 @@ import 'package:skep_app/features/dashboard/view/bp_settlement_page.dart';
 import 'package:skep_app/features/dashboard/view/matching_request_page.dart';
 import 'package:skep_app/features/dashboard/view/realtime_location_page.dart';
 import 'package:skep_app/features/dashboard/view/work_confirmation_page.dart';
+import 'package:skep_app/features/dashboard/view/site_management_page.dart';
+import 'package:skep_app/features/dashboard/view/quotation_management_page.dart';
+import 'package:skep_app/features/dashboard/view/checklist_management_page.dart';
 import 'package:skep_app/features/dashboard/view/placeholder_page.dart';
 
 class BPDashboard extends StatefulWidget {
@@ -72,6 +75,21 @@ class _BPDashboardState extends State<BPDashboard> {
       label: '작업확인서',
     ),
     SidebarMenuItem(
+      id: 'sites',
+      icon: Icons.location_city_outlined,
+      label: '현장 관리',
+    ),
+    SidebarMenuItem(
+      id: 'quotations',
+      icon: Icons.request_quote_outlined,
+      label: '견적 관리',
+    ),
+    SidebarMenuItem(
+      id: 'checklist',
+      icon: Icons.checklist_outlined,
+      label: '투입 체크리스트',
+    ),
+    SidebarMenuItem(
       id: 'employees',
       icon: Icons.badge_outlined,
       label: '직원 관리',
@@ -125,6 +143,12 @@ class _BPDashboardState extends State<BPDashboard> {
         return const RealtimeLocationPage();
       case 'work_confirm':
         return const WorkConfirmationPage();
+      case 'sites':
+        return const SiteManagementPage();
+      case 'quotations':
+        return const QuotationManagementPage();
+      case 'checklist':
+        return const ChecklistManagementPage();
       case 'employees':
         return const CompanyEmployeePage();
       default:
@@ -150,6 +174,12 @@ class _BPDashboardState extends State<BPDashboard> {
         return '실시간 위치';
       case 'work_confirm':
         return '작업확인서';
+      case 'sites':
+        return '현장 관리';
+      case 'quotations':
+        return '견적 관리';
+      case 'checklist':
+        return '투입 체크리스트';
       case 'employees':
         return '직원 관리';
       default:

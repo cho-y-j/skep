@@ -20,6 +20,11 @@ import 'package:skep_app/features/dashboard/view/admin_statistics_page.dart';
 import 'package:skep_app/features/dashboard/view/admin_notification_page.dart';
 import 'package:skep_app/features/dashboard/view/realtime_location_page.dart';
 import 'package:skep_app/features/dashboard/view/alert_notification_page.dart';
+import 'package:skep_app/features/dashboard/view/site_management_page.dart';
+import 'package:skep_app/features/dashboard/view/quotation_management_page.dart';
+import 'package:skep_app/features/dashboard/view/checklist_management_page.dart';
+import 'package:skep_app/features/dashboard/view/document_preview_page.dart';
+import 'package:skep_app/features/dashboard/view/verification_page.dart';
 import 'package:skep_app/features/dashboard/view/placeholder_page.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -93,6 +98,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
       label: '투입 관리',
     ),
     SidebarMenuItem(
+      id: 'sites',
+      icon: Icons.location_city_outlined,
+      label: '현장 관리',
+    ),
+    SidebarMenuItem(
+      id: 'quotations',
+      icon: Icons.request_quote_outlined,
+      label: '견적 관리',
+    ),
+    SidebarMenuItem(
+      id: 'checklist',
+      icon: Icons.checklist_outlined,
+      label: '투입 체크리스트',
+    ),
+    SidebarMenuItem(
       id: 'documents',
       icon: Icons.description_outlined,
       label: '서류 관리',
@@ -121,6 +141,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
       id: 'location',
       icon: Icons.location_on_outlined,
       label: '실시간 위치',
+    ),
+    SidebarMenuItem(
+      id: 'document_preview',
+      icon: Icons.preview_outlined,
+      label: '서류 미리보기',
+    ),
+    SidebarMenuItem(
+      id: 'verification',
+      icon: Icons.verified_outlined,
+      label: '검증 관리',
     ),
   ];
 
@@ -196,6 +226,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return const EquipmentStatusPage();
       case 'deployment':
         return const AdminDeploymentPage();
+      case 'sites':
+        return const SiteManagementPage();
+      case 'quotations':
+        return const QuotationManagementPage();
+      case 'checklist':
+        return const ChecklistManagementPage();
       case 'documents':
         return const AdminDocumentManagementPage();
       case 'inspection':
@@ -208,6 +244,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return const AlertNotificationPage();
       case 'location':
         return const RealtimeLocationPage();
+      case 'document_preview':
+        return const DocumentPreviewPage();
+      case 'verification':
+        return const VerificationPage();
       default:
         return const AdminDashboardHome();
     }
@@ -233,6 +273,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return '장비 현황';
       case 'deployment':
         return '투입 관리';
+      case 'sites':
+        return '현장 관리';
+      case 'quotations':
+        return '견적 관리';
+      case 'checklist':
+        return '투입 체크리스트';
       case 'documents':
         return '서류 관리';
       case 'inspection':
@@ -245,6 +291,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return '알림/메시지';
       case 'location':
         return '실시간 위치';
+      case 'document_preview':
+        return '서류 미리보기';
+      case 'verification':
+        return '검증 관리';
       default:
         return '관리자 대시보드';
     }
