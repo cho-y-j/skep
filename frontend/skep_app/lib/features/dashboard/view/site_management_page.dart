@@ -19,6 +19,7 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
   bool _isLoading = true;
   String? _error;
   int? _expandedSiteIndex;
+  bool _showMapInDialog = false;
 
   @override
   void initState() {
@@ -141,6 +142,7 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
   }
 
   void _showCreateDialog() {
+    _showMapInDialog = false;
     final nameController = TextEditingController();
     final addressController = TextEditingController();
     final descController = TextEditingController();
@@ -149,7 +151,7 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
     final radiusController = TextEditingController(text: '500');
     final coordsController = TextEditingController();
     String boundaryType = 'CIRCLE';
-    int? selectedBpCompanyId;
+    String? selectedBpCompanyId;
     List<Map<String, dynamic>> bpCompanies = [];
     bool loadingBp = true;
 
@@ -208,15 +210,15 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
                       const SizedBox(height: 16),
                       loadingBp
                           ? const Center(child: CircularProgressIndicator())
-                          : DropdownButtonFormField<int>(
+                          : DropdownButtonFormField<String>(
                               value: selectedBpCompanyId,
                               decoration: const InputDecoration(
                                 labelText: 'BP사 선택',
                                 border: OutlineInputBorder(),
                               ),
                               items: bpCompanies.map((c) {
-                                return DropdownMenuItem<int>(
-                                  value: c['id'] as int?,
+                                return DropdownMenuItem<String>(
+                                  value: c['id']?.toString(),
                                   child: Text(c['name']?.toString() ?? c['companyName']?.toString() ?? '-'),
                                 );
                               }).toList(),
@@ -251,7 +253,24 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Interactive map
+                      // Map toggle button
+                      if (!_showMapInDialog) ...[
+                        ElevatedButton.icon(
+                          onPressed: () => setDialogState(() => _showMapInDialog = true),
+                          icon: const Icon(Icons.map, size: 18),
+                          label: const Text('지도에서 위치 선택'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2196F3),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 44),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('또는 아래에 좌표를 직접 입력하세요', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                      ],
+
+                      // Interactive map (only when toggled)
+                      if (_showMapInDialog)
                       Container(
                         height: 250,
                         decoration: BoxDecoration(
@@ -615,27 +634,28 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
     }
 
     return Container(
-      height: 200,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
+        color: const Color(0xFFF0F9FF),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         borderRadius: BorderRadius.circular(8),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: FlutterMap(
-        options: MapOptions(
-          initialCenter: center,
-          initialZoom: zoom,
-          interactionOptions: const InteractionOptions(
-            flags: InteractiveFlag.pinchZoom | InteractiveFlag.drag,
-          ),
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'com.skep.app',
-          ),
-          if (polygons.isNotEmpty) PolygonLayer(polygons: polygons),
-          if (markers.isNotEmpty) MarkerLayer(markers: markers),
+          Row(children: [
+            const Icon(Icons.map, color: Color(0xFF2196F3), size: 20),
+            const SizedBox(width: 8),
+            Text('위치 정보', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey[800])),
+          ]),
+          const SizedBox(height: 8),
+          Text('중심: ${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
+              style: const TextStyle(fontSize: 13, fontFamily: 'monospace')),
+          if (site['radiusMeters'] != null)
+            Text('반경: ${site['radiusMeters']}m', style: const TextStyle(fontSize: 13)),
+          if (site['boundaryCoordinates'] != null)
+            Text('좌표: ${site['boundaryCoordinates'].toString().substring(0, (site['boundaryCoordinates'].toString().length).clamp(0, 60))}...',
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.grey)),
         ],
       ),
     );

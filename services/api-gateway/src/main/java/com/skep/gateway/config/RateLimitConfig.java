@@ -15,7 +15,7 @@ import java.time.Duration;
 @Configuration
 public class RateLimitConfig {
 
-    private static final int MAX_REQUESTS = 100;
+    private static final int MAX_REQUESTS = 1000;
     private static final Duration WINDOW = Duration.ofMinutes(1);
 
     @Bean

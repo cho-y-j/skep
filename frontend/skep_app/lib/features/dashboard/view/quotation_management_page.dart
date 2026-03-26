@@ -163,7 +163,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
     final descController = TextEditingController();
     final startDateController = TextEditingController();
     final endDateController = TextEditingController();
-    int? selectedSiteId;
+    String? selectedSiteId;
     List<Map<String, dynamic>> sites = [];
     bool loadingSites = true;
 
@@ -195,15 +195,15 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                     children: [
                       loadingSites
                           ? const Center(child: CircularProgressIndicator())
-                          : DropdownButtonFormField<int>(
+                          : DropdownButtonFormField<String>(
                               value: selectedSiteId,
                               decoration: const InputDecoration(
                                 labelText: '현장 선택',
                                 border: OutlineInputBorder(),
                               ),
                               items: sites.map((s) {
-                                return DropdownMenuItem<int>(
-                                  value: s['id'] as int?,
+                                return DropdownMenuItem<String>(
+                                  value: s['id']?.toString(),
                                   child: Text(s['name']?.toString() ?? s['siteName']?.toString() ?? '-'),
                                 );
                               }).toList(),
@@ -297,7 +297,7 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
 
   void _showCreateQuotationDialog() {
     final supplierController = TextEditingController();
-    int? selectedRequestId;
+    String? selectedRequestId;
     final items = <Map<String, dynamic>>[];
 
     showDialog(
@@ -313,15 +313,15 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      DropdownButtonFormField<int>(
+                      DropdownButtonFormField<String>(
                         value: selectedRequestId,
                         decoration: const InputDecoration(
                           labelText: '견적 요청 선택',
                           border: OutlineInputBorder(),
                         ),
                         items: _requests.map((r) {
-                          return DropdownMenuItem<int>(
-                            value: r['id'] as int?,
+                          return DropdownMenuItem<String>(
+                            value: r['id']?.toString(),
                             child: Text(r['title']?.toString() ?? '요청 #${r['id']}'),
                           );
                         }).toList(),
