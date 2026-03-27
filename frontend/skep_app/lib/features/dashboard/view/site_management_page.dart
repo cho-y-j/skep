@@ -548,11 +548,11 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
 
   /// Build a small map preview widget for a site
   Widget _buildSiteMapPreview(Map<String, dynamic> site) {
-    final boundaryType = site['boundaryType']?.toString()?.toUpperCase();
-    final lat = (site['latitude'] as num?)?.toDouble();
-    final lng = (site['longitude'] as num?)?.toDouble();
-    final radius = (site['radius'] as num?)?.toDouble();
-    final coords = site['coordinates'];
+    final boundaryType = site['boundaryType']?.toString().toUpperCase();
+    final lat = (site['centerLat'] as num?)?.toDouble() ?? (site['latitude'] as num?)?.toDouble();
+    final lng = (site['centerLng'] as num?)?.toDouble() ?? (site['longitude'] as num?)?.toDouble();
+    final radius = (site['radiusMeters'] as num?)?.toDouble() ?? (site['radius'] as num?)?.toDouble();
+    final coords = site['boundaryCoordinates'] ?? site['coordinates'];
 
     LatLng center = const LatLng(37.5665, 126.9780);
     double zoom = 14;
