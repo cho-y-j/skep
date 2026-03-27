@@ -508,11 +508,11 @@ class _SiteManagementPageState extends State<SiteManagementPage> {
                       body['bpCompanyId'] = selectedBpCompanyId;
                     }
                     if (boundaryType == 'CIRCLE') {
-                      if (latController.text.isNotEmpty) body['latitude'] = double.tryParse(latController.text);
-                      if (lngController.text.isNotEmpty) body['longitude'] = double.tryParse(lngController.text);
-                      if (radiusController.text.isNotEmpty) body['radius'] = double.tryParse(radiusController.text);
+                      if (latController.text.isNotEmpty) body['centerLat'] = double.tryParse(latController.text);
+                      if (lngController.text.isNotEmpty) body['centerLng'] = double.tryParse(lngController.text);
+                      if (radiusController.text.isNotEmpty) body['radiusMeters'] = int.tryParse(radiusController.text);
                     } else {
-                      if (coordsController.text.isNotEmpty) body['coordinates'] = coordsController.text.trim();
+                      if (coordsController.text.isNotEmpty) body['boundaryCoordinates'] = coordsController.text.trim();
                     }
                     try {
                       final dioClient = context.read<DioClient>();
