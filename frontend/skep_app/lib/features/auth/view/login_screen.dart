@@ -57,8 +57,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_passwordController.text.isEmpty) {
       setState(() => _passwordError = '비밀번호를 입력해주세요');
       isValid = false;
-    } else if (_passwordController.text.length < 6) {
-      setState(() => _passwordError = '비밀번호는 6자 이상이어야 합니다');
+    } else if (_passwordController.text.length < 4) {
+      setState(() => _passwordError = '비밀번호는 4자 이상이어야 합니다');
       isValid = false;
     }
 
