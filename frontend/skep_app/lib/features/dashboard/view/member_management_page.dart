@@ -352,7 +352,7 @@ class _MemberManagementPageState extends State<MemberManagementPage> {
                         obscureText: true,
                         decoration: const InputDecoration(
                           labelText: '비밀번호',
-                          hintText: '영문+숫자+특수문자 8자 이상',
+                          hintText: '4자 이상',
                           border: OutlineInputBorder(),
                         ),
                       ),
