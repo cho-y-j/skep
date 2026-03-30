@@ -10,6 +10,7 @@ import 'package:skep_app/features/auth/view/register_screen.dart';
 import 'package:skep_app/features/dashboard/view/admin_dashboard.dart';
 import 'package:skep_app/features/dashboard/view/bp_dashboard.dart';
 import 'package:skep_app/features/dashboard/view/supplier_dashboard.dart';
+import 'package:skep_app/features/dashboard/view/worker_dashboard.dart';
 import 'package:skep_app/features/dispatch/bloc/dispatch_bloc.dart';
 import 'package:skep_app/features/dispatch/view/work_record_screen.dart';
 import 'package:skep_app/features/inspection/bloc/inspection_bloc.dart';
@@ -69,7 +70,13 @@ class AppRouter {
         builder: (context, state) => const BPDashboard(),
       ),
 
-      // Work Record routes
+      // Worker dashboard (DRIVER, GUIDE, SAFETY_INSPECTOR)
+      GoRoute(
+        path: '/worker-dashboard',
+        builder: (context, state) => const WorkerDashboard(),
+      ),
+
+      // Work Record routes (legacy)
       GoRoute(
         path: '/work-records',
         builder: (context, state) => BlocProvider(
@@ -167,9 +174,8 @@ class AppRouter {
         return '/bp-dashboard';
       case UserRole.driver:
       case UserRole.guide:
-        return '/work-records';
       case UserRole.safetyInspector:
-        return '/inspections/current';
+        return '/worker-dashboard';
     }
   }
 }
