@@ -313,6 +313,8 @@ class _MemberManagementPageState extends State<MemberManagementPage> {
   void _showAddDialog() {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final phoneController = TextEditingController();
     String selectedRole = 'DRIVER';
     String selectedStatus = '활성';
 
@@ -343,6 +345,26 @@ class _MemberManagementPageState extends State<MemberManagementPage> {
                           labelText: '이메일',
                           border: OutlineInputBorder(),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: '비밀번호',
+                          hintText: '영문+숫자+특수문자 8자 이상',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: phoneController,
+                        decoration: const InputDecoration(
+                          labelText: '전화번호',
+                          hintText: '010-0000-0000',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.phone,
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
@@ -393,23 +415,41 @@ class _MemberManagementPageState extends State<MemberManagementPage> {
                   child: const Text('취소'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (nameController.text.trim().isEmpty ||
-                        emailController.text.trim().isEmpty) {
+                        emailController.text.trim().isEmpty ||
+                        passwordController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('이름, 이메일, 비밀번호는 필수입니다'), backgroundColor: AppColors.error),
+                      );
                       return;
                     }
-                    setState(() {
-                      _users.add({
-                        'name': nameController.text.trim(),
-                        'email': emailController.text.trim(),
-                        'role': selectedRole,
-                        'is_active': selectedStatus == '활성',
-                        'status': selectedStatus,
-                        'company_name': '-',
-                        'created_at': DateTime.now().toIso8601String(),
-                      });
-                    });
-                    Navigator.of(ctx).pop();
+                    try {
+                      final dioClient = context.read<DioClient>();
+                      await dioClient.post<dynamic>(
+                        '/api/auth/register',
+                        data: {
+                          'name': nameController.text.trim(),
+                          'email': emailController.text.trim(),
+                          'password': passwordController.text.trim(),
+                          'phone': phoneController.text.trim().isNotEmpty ? phoneController.text.trim() : '010-0000-0000',
+                          'role': selectedRole,
+                        },
+                      );
+                      if (mounted) Navigator.of(ctx).pop();
+                      await _loadUsers();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('사용자가 추가되었습니다'), backgroundColor: AppColors.success),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('추가 실패: $e'), backgroundColor: AppColors.error),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
