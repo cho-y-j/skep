@@ -27,6 +27,11 @@ public class SafetyInspectionService {
     private final InspectionItemResultRepository itemResultRepository;
     private final InspectionItemMasterRepository itemMasterRepository;
 
+    @Transactional(readOnly = true)
+    public List<SafetyInspection> getAllInspections() {
+        return safetyInspectionRepository.findAll();
+    }
+
     public SafetyInspection startInspection(StartSafetyInspectionRequest request) {
         // GPS 거리 검증
         if (!GpsUtil.isWithinInspectionRange(

@@ -379,12 +379,12 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
           final status = eq['status']?.toString();
           return DataRow(
             cells: [
-              DataCell(Text(eq['vehicleNumber']?.toString() ?? eq['name']?.toString() ?? eq['equipment_name']?.toString() ?? '-')),
-              DataCell(Text(eq['equipmentTypeName']?.toString() ?? eq['equipmentType']?.toString() ?? eq['type']?.toString() ?? '-')),
+              DataCell(Text(eq['vehicle_number']?.toString() ?? eq['vehicleNumber']?.toString() ?? '-')),
+              DataCell(Text(eq['equipment_type_name']?.toString() ?? eq['equipmentTypeName']?.toString() ?? '-')),
               DataCell(Text(
-                '${eq['modelName']?.toString() ?? eq['model']?.toString() ?? '-'} / ${eq['manufacturer']?.toString() ?? '-'}',
+                '${eq['model_name']?.toString() ?? eq['modelName']?.toString() ?? '-'} / ${eq['manufacturer']?.toString() ?? '-'}',
               )),
-              DataCell(Text(eq['companyName']?.toString() ?? eq['supplier_name']?.toString() ?? '-')),
+              DataCell(Text(eq['supplier_name']?.toString() ?? eq['companyName']?.toString() ?? '-')),
               DataCell(
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

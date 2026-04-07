@@ -20,6 +20,11 @@ public class SafetyInspectionController {
 
     private final SafetyInspectionService safetyInspectionService;
 
+    @GetMapping
+    public ResponseEntity<java.util.List<SafetyInspection>> getAllInspections() {
+        return ResponseEntity.ok(safetyInspectionService.getAllInspections());
+    }
+
     @PostMapping("/start")
     public ResponseEntity<SafetyInspection> startInspection(@RequestBody StartSafetyInspectionRequest request) {
         SafetyInspection inspection = safetyInspectionService.startInspection(request);
