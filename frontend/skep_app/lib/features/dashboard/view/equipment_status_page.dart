@@ -144,13 +144,39 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
     final vehicleNumberController = TextEditingController();
     final modelNameController = TextEditingController();
     final manufacturerController = TextEditingController();
+    final yearController = TextEditingController(text: '2024');
     String selectedType = '';
+    String? selectedSupplierId;
+    List<Map<String, dynamic>> suppliers = [];
+    List<Map<String, dynamic>> eqTypes = [];
+    bool loadingData = true;
+
+    // 공급사 + 장비타입 로드
+    final dioClient = context.read<DioClient>();
+    Future.wait([
+      dioClient.get<dynamic>('/api/auth/companies/type/EQUIPMENT_SUPPLIER'),
+      dioClient.get<dynamic>('/api/equipment/types'),
+    ]).then((results) {
+      final supData = results[0].data;
+      final typeData = results[1].data;
+      if (supData is List) suppliers = supData.cast<Map<String, dynamic>>();
+      if (typeData is List) eqTypes = typeData.cast<Map<String, dynamic>>();
+      loadingData = false;
+      if (suppliers.isNotEmpty) selectedSupplierId = suppliers[0]['id']?.toString();
+      if (eqTypes.isNotEmpty) selectedType = eqTypes[0]['name']?.toString() ?? '';
+    }).catchError((_) { loadingData = false; });
 
     showDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
+            // 데이터 로드 후 리빌드
+            if (loadingData) {
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (ctx.mounted) setDialogState(() {});
+              });
+            }
             return AlertDialog(
               title: const Text('장비 추가'),
               content: SizedBox(
@@ -159,11 +185,49 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (suppliers.isNotEmpty)
+                        DropdownButtonFormField<String>(
+                          value: selectedSupplierId,
+                          decoration: const InputDecoration(
+                            labelText: '공급사 *',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: suppliers.map((s) => DropdownMenuItem<String>(
+                            value: s['id']?.toString(),
+                            child: Text(s['name']?.toString() ?? '-'),
+                          )).toList(),
+                          onChanged: (v) => setDialogState(() => selectedSupplierId = v),
+                        ),
+                      const SizedBox(height: 16),
+                      if (eqTypes.isNotEmpty)
+                        DropdownButtonFormField<String>(
+                          value: eqTypes.any((t) => t['name'] == selectedType) ? selectedType : null,
+                          decoration: const InputDecoration(
+                            labelText: '장비 유형 *',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: eqTypes.map((t) => DropdownMenuItem<String>(
+                            value: t['name']?.toString(),
+                            child: Text(t['name']?.toString() ?? '-'),
+                          )).toList(),
+                          onChanged: (v) => setDialogState(() => selectedType = v ?? ''),
+                        )
+                      else
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: '장비 유형 *',
+                            border: OutlineInputBorder(),
+                            hintText: '예: 대형 크레인',
+                          ),
+                          onChanged: (v) => selectedType = v,
+                        ),
+                      const SizedBox(height: 16),
                       TextField(
                         controller: vehicleNumberController,
                         decoration: const InputDecoration(
-                          labelText: '차량번호',
+                          labelText: '차량번호 *',
                           border: OutlineInputBorder(),
+                          hintText: '예: 서울11가1111',
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -184,12 +248,12 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
                       ),
                       const SizedBox(height: 16),
                       TextField(
-                        decoration: InputDecoration(
-                          labelText: '장비 유형',
-                          border: const OutlineInputBorder(),
-                          hintText: '예: 타워크레인, 굴착기',
+                        controller: yearController,
+                        decoration: const InputDecoration(
+                          labelText: '제조연도',
+                          border: OutlineInputBorder(),
                         ),
-                        onChanged: (v) => selectedType = v,
+                        keyboardType: TextInputType.number,
                       ),
                     ],
                   ),
@@ -202,16 +266,17 @@ class _EquipmentStatusPageState extends State<EquipmentStatusPage> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    if (vehicleNumberController.text.trim().isEmpty) return;
+                    if (vehicleNumberController.text.trim().isEmpty || selectedType.isEmpty) return;
                     try {
-                      final dioClient = context.read<DioClient>();
                       await dioClient.post<dynamic>(
                         ApiEndpoints.equipments,
                         data: {
-                          'vehicleNumber': vehicleNumberController.text.trim(),
-                          'modelName': modelNameController.text.trim(),
+                          'supplier_id': selectedSupplierId,
+                          'equipment_type_name': selectedType.trim(),
+                          'vehicle_number': vehicleNumberController.text.trim(),
+                          'model_name': modelNameController.text.trim(),
                           'manufacturer': manufacturerController.text.trim(),
-                          'equipmentType': selectedType.trim(),
+                          'manufacture_year': int.tryParse(yearController.text.trim()) ?? 2024,
                         },
                       );
                       if (mounted) Navigator.of(ctx).pop();
