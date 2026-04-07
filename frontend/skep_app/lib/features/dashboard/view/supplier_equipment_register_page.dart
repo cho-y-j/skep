@@ -8,6 +8,8 @@ import 'package:skep_app/core/constants/api_endpoints.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
 import 'package:skep_app/core/network/dio_client.dart';
+import 'package:skep_app/features/auth/bloc/auth_bloc.dart';
+import 'package:skep_app/features/auth/bloc/auth_state.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
 import 'package:skep_app/features/dashboard/view/supplier_equipment_page.dart';
 
@@ -538,14 +540,19 @@ class _SupplierEquipmentRegisterPageState
 
     try {
       final dioClient = context.read<DioClient>();
+      // Get supplier_id from authenticated user's company
+      String? supplierId;
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        supplierId = authState.user.companyId;
+      }
+
       final body = {
-        'vehicleNumber': _vehicleNumberController.text.trim(),
-        'type': _selectedEquipmentType,
-        'equipmentType': _selectedEquipmentType,
-        'model': _modelNameController.text.trim(),
-        'modelName': _modelNameController.text.trim(),
-        'manufacturer': _manufacturerController.text.trim(),
-        'manufacturingYear': _manufacturingYearController.text.trim(),
+        'supplier_id': supplierId,
+        'equipment_type_name': _selectedEquipmentType,
+        'vehicle_number': _vehicleNumberController.text.trim(),
+        'model_name': _modelNameController.text.trim(),
+        'manufacture_year': _manufacturingYearController.text.trim(),
       };
 
       await dioClient.post<dynamic>(ApiEndpoints.equipments, data: body);

@@ -132,9 +132,112 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Future<void> _clockIn() async {
+    // Show dialog to select roster and worker before clocking in
+    String? selectedRosterId;
+    String? selectedWorkerId;
+    String selectedWorkerType = 'DRIVER';
+
+    if (_apiRecords.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('출근할 배치 정보가 없습니다. 먼저 일일 배치를 확인하세요.'), backgroundColor: Color(0xFFD97706)),
+        );
+      }
+      return;
+    }
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('출근 기록'),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: '배치 선택',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _apiRecords.map((r) {
+                        final id = r['id']?.toString() ?? '';
+                        final label = '${r['workerName'] ?? r['operatorName'] ?? r['name'] ?? '-'} - ${r['equipmentName'] ?? r['equipment'] ?? '-'}';
+                        return DropdownMenuItem<String>(value: id, child: Text(label));
+                      }).toList(),
+                      onChanged: (val) {
+                        setDialogState(() {
+                          selectedRosterId = val;
+                          // Auto-fill worker info from selected roster
+                          final roster = _apiRecords.firstWhere(
+                            (r) => r['id']?.toString() == val,
+                            orElse: () => <String, dynamic>{},
+                          );
+                          selectedWorkerId = roster['workerId']?.toString() ?? roster['operatorId']?.toString();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedWorkerType,
+                      decoration: const InputDecoration(
+                        labelText: '작업자 유형',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'DRIVER', child: Text('운전원')),
+                        DropdownMenuItem(value: 'GUIDE', child: Text('유도원')),
+                        DropdownMenuItem(value: 'WORKER', child: Text('작업자')),
+                      ],
+                      onChanged: (val) => setDialogState(() => selectedWorkerType = val ?? 'DRIVER'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('취소'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (selectedRosterId == null) return;
+                    Navigator.of(ctx).pop({
+                      'rosterId': selectedRosterId!,
+                      'workerId': selectedWorkerId ?? '',
+                      'workerType': selectedWorkerType,
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('출근'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) return;
+
     try {
       final dioClient = context.read<DioClient>();
-      await dioClient.post<dynamic>(ApiEndpoints.clockIn);
+      await dioClient.post<dynamic>(
+        ApiEndpoints.clockIn,
+        data: {
+          'dailyRosterId': result['rosterId'],
+          'workerId': result['workerId'],
+          'workerType': result['workerType'],
+          'gpsLat': 0.0,
+          'gpsLng': 0.0,
+        },
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('출근이 기록되었습니다.'), backgroundColor: Color(0xFF16A34A)),

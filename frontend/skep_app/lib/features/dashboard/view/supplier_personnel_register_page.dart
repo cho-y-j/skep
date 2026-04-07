@@ -8,6 +8,8 @@ import 'package:skep_app/core/constants/api_endpoints.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/app_text_styles.dart';
 import 'package:skep_app/core/network/dio_client.dart';
+import 'package:skep_app/features/auth/bloc/auth_bloc.dart';
+import 'package:skep_app/features/auth/bloc/auth_state.dart';
 import 'package:skep_app/features/dashboard/view/document_type_master_page.dart';
 import 'package:skep_app/features/dashboard/view/supplier_personnel_page.dart';
 
@@ -519,12 +521,19 @@ class _SupplierPersonnelRegisterPageState
 
     try {
       final dioClient = context.read<DioClient>();
+      // Get supplier_id from authenticated user's company
+      String? supplierId;
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        supplierId = authState.user.companyId;
+      }
+
       final body = {
-        'type': _selectedPersonnelType,
-        'personnelType': _selectedPersonnelType,
+        'supplier_id': supplierId,
+        'person_type': _selectedPersonnelType,
         'name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'birthDate': _birthDateController.text.trim(),
+        'birth_date': _birthDateController.text.trim(),
       };
 
       await dioClient.post<dynamic>(ApiEndpoints.persons, data: body);

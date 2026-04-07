@@ -161,11 +161,11 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
     String? selectedOperator;
     DateTime startDate = DateTime.now();
     DateTime endDate = DateTime.now().add(const Duration(days: 90));
+    TimeOfDay startTime = const TimeOfDay(hour: 7, minute: 0);
+    TimeOfDay endTime = const TimeOfDay(hour: 17, minute: 0);
     final dayPriceCtrl = TextEditingController();
     final otPriceCtrl = TextEditingController();
-    final earlyPriceCtrl = TextEditingController();
     final nightPriceCtrl = TextEditingController();
-    final allNightPriceCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -288,14 +288,62 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final t = await showTimePicker(
+                              context: ctx,
+                              initialTime: startTime,
+                            );
+                            if (t != null) {
+                              setDialogState(() => startTime = t);
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: '시작시간',
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(
+                              '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () async {
+                            final t = await showTimePicker(
+                              context: ctx,
+                              initialTime: endTime,
+                            );
+                            if (t != null) {
+                              setDialogState(() => endTime = t);
+                            }
+                          },
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: '종료시간',
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(
+                              '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 16),
                   Text('단가 입력', style: AppTextStyles.titleMedium),
                   const SizedBox(height: 8),
                   _buildPriceField('주간일대', dayPriceCtrl),
                   _buildPriceField('주간O/T', otPriceCtrl),
-                  _buildPriceField('조출', earlyPriceCtrl),
                   _buildPriceField('야간', nightPriceCtrl),
-                  _buildPriceField('철야', allNightPriceCtrl),
                 ],
               ),
             ),
@@ -310,20 +358,29 @@ class _SupplierDeploymentPageState extends State<SupplierDeploymentPage> {
                 Navigator.pop(ctx);
                 try {
                   final dioClient = context.read<DioClient>();
+                  // Resolve siteName from selected site
+                  String? siteName;
+                  if (selectedSite != null) {
+                    final matchedSite = _sites.where((s) => (s['id'] ?? s['name'] ?? '').toString() == selectedSite).toList();
+                    if (matchedSite.isNotEmpty) {
+                      siteName = matchedSite.first['name']?.toString() ?? matchedSite.first['siteName']?.toString();
+                    }
+                  }
+
                   await dioClient.post<dynamic>(
                     ApiEndpoints.deploymentPlans,
                     data: {
-                      'siteId': selectedSite,
+                      'supplierId': selectedOperator,
                       'bpCompanyId': selectedBp,
+                      'siteName': siteName ?? '',
                       'equipmentId': selectedEquipment,
-                      'operatorId': selectedOperator,
                       'startDate': '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}',
+                      'startTime': '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}',
                       'endDate': '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}',
-                      'dayPrice': dayPriceCtrl.text,
-                      'otPrice': otPriceCtrl.text,
-                      'earlyPrice': earlyPriceCtrl.text,
-                      'nightPrice': nightPriceCtrl.text,
-                      'allNightPrice': allNightPriceCtrl.text,
+                      'endTime': '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
+                      'rateDaily': dayPriceCtrl.text,
+                      'rateOvertime': otPriceCtrl.text,
+                      'rateNight': nightPriceCtrl.text,
                     },
                   );
                   if (mounted) {

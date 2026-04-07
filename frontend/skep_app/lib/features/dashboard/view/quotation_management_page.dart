@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:skep_app/core/constants/app_colors.dart';
 import 'package:skep_app/core/constants/api_endpoints.dart';
 import 'package:skep_app/core/network/dio_client.dart';
+import 'package:skep_app/features/auth/bloc/auth_bloc.dart';
+import 'package:skep_app/features/auth/bloc/auth_state.dart';
 
 class QuotationManagementPage extends StatefulWidget {
   const QuotationManagementPage({Key? key}) : super(key: key);
@@ -164,17 +166,30 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
     final startDateController = TextEditingController();
     final endDateController = TextEditingController();
     String? selectedSiteId;
+    String? selectedBpCompanyId;
     List<Map<String, dynamic>> sites = [];
+    List<Map<String, dynamic>> bpCompanies = [];
     bool loadingSites = true;
 
     showDialog(
       context: context,
       builder: (ctx) {
-        context.read<DioClient>().get<dynamic>(ApiEndpoints.sites).then((res) {
-          if (res.data is List) {
-            sites = (res.data as List).cast<Map<String, dynamic>>();
-          } else if (res.data is Map && res.data['content'] is List) {
-            sites = (res.data['content'] as List).cast<Map<String, dynamic>>();
+        final dioClientLocal = context.read<DioClient>();
+        Future.wait([
+          dioClientLocal.get<dynamic>(ApiEndpoints.sites),
+          dioClientLocal.get<dynamic>(ApiEndpoints.companiesByType.replaceAll('{type}', 'BP_COMPANY')),
+        ]).then((responses) {
+          final siteRes = responses[0];
+          if (siteRes.data is List) {
+            sites = (siteRes.data as List).cast<Map<String, dynamic>>();
+          } else if (siteRes.data is Map && siteRes.data['content'] is List) {
+            sites = (siteRes.data['content'] as List).cast<Map<String, dynamic>>();
+          }
+          final bpRes = responses[1];
+          if (bpRes.data is List) {
+            bpCompanies = (bpRes.data as List).cast<Map<String, dynamic>>();
+          } else if (bpRes.data is Map && bpRes.data['content'] is List) {
+            bpCompanies = (bpRes.data['content'] as List).cast<Map<String, dynamic>>();
           }
           loadingSites = false;
           if (ctx.mounted) (ctx as Element).markNeedsBuild();
@@ -208,6 +223,23 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                                 );
                               }).toList(),
                               onChanged: (val) => setDialogState(() => selectedSiteId = val),
+                            ),
+                      const SizedBox(height: 16),
+                      loadingSites
+                          ? const SizedBox.shrink()
+                          : DropdownButtonFormField<String>(
+                              value: selectedBpCompanyId,
+                              decoration: const InputDecoration(
+                                labelText: 'BP사 선택',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: bpCompanies.map((c) {
+                                return DropdownMenuItem<String>(
+                                  value: c['id']?.toString(),
+                                  child: Text(c['name']?.toString() ?? c['companyName']?.toString() ?? '-'),
+                                );
+                              }).toList(),
+                              onChanged: (val) => setDialogState(() => selectedBpCompanyId = val),
                             ),
                       const SizedBox(height: 16),
                       TextField(
@@ -260,10 +292,11 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                         ApiEndpoints.quotationRequests,
                         data: {
                           'siteId': selectedSiteId,
+                          'bpCompanyId': selectedBpCompanyId,
                           'title': titleController.text.trim(),
                           'description': descController.text.trim(),
-                          'startDate': startDateController.text.trim(),
-                          'endDate': endDateController.text.trim(),
+                          'desiredStartDate': startDateController.text.trim(),
+                          'desiredEndDate': endDateController.text.trim(),
                         },
                       );
                       if (mounted) Navigator.of(ctx).pop();
@@ -296,13 +329,36 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
   }
 
   void _showCreateQuotationDialog() {
-    final supplierController = TextEditingController();
+    String? selectedSupplierId;
     String? selectedRequestId;
+    final notesController = TextEditingController();
     final items = <Map<String, dynamic>>[];
+    List<Map<String, dynamic>> suppliers = [];
+    bool loadingSuppliers = true;
+
+    // Get supplier_id from auth state as default
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated && authState.user.companyId != null) {
+      selectedSupplierId = authState.user.companyId;
+    }
 
     showDialog(
       context: context,
       builder: (ctx) {
+        // Load suppliers list
+        context.read<DioClient>().get<dynamic>(ApiEndpoints.companiesByType.replaceAll('{type}', 'SUPPLIER')).then((res) {
+          if (res.data is List) {
+            suppliers = (res.data as List).cast<Map<String, dynamic>>();
+          } else if (res.data is Map && res.data['content'] is List) {
+            suppliers = (res.data['content'] as List).cast<Map<String, dynamic>>();
+          }
+          loadingSuppliers = false;
+          if (ctx.mounted) (ctx as Element).markNeedsBuild();
+        }).catchError((_) {
+          loadingSuppliers = false;
+          if (ctx.mounted) (ctx as Element).markNeedsBuild();
+        });
+
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
@@ -328,12 +384,30 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                         onChanged: (val) => setDialogState(() => selectedRequestId = val),
                       ),
                       const SizedBox(height: 16),
+                      loadingSuppliers
+                          ? const Center(child: CircularProgressIndicator())
+                          : DropdownButtonFormField<String>(
+                              value: selectedSupplierId,
+                              decoration: const InputDecoration(
+                                labelText: '공급사 선택',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: suppliers.map((s) {
+                                return DropdownMenuItem<String>(
+                                  value: s['id']?.toString(),
+                                  child: Text(s['name']?.toString() ?? s['companyName']?.toString() ?? '-'),
+                                );
+                              }).toList(),
+                              onChanged: (val) => setDialogState(() => selectedSupplierId = val),
+                            ),
+                      const SizedBox(height: 16),
                       TextField(
-                        controller: supplierController,
+                        controller: notesController,
                         decoration: const InputDecoration(
-                          labelText: '공급사명',
+                          labelText: '비고',
                           border: OutlineInputBorder(),
                         ),
+                        maxLines: 2,
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -447,7 +521,9 @@ class _QuotationManagementPageState extends State<QuotationManagementPage> with 
                         ApiEndpoints.quotations,
                         data: {
                           'requestId': selectedRequestId,
-                          'supplierName': supplierController.text.trim(),
+                          'supplierId': selectedSupplierId,
+                          'totalAmount': items.fold<int>(0, (sum, item) => sum + ((item['rateDaily'] as int? ?? 0) * (item['quantity'] as int? ?? 1))),
+                          'notes': notesController.text.trim(),
                           'items': items,
                         },
                       );
