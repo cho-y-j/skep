@@ -37,12 +37,13 @@ export function TopBar() {
     PAGE_TITLES[location.pathname] ?? "SKEP";
 
   const { data: unreadData } = useQuery({
-    queryKey: queryKeys.notifications.unreadCount,
-    queryFn: () => notificationsApi.unreadCount(),
-    refetchInterval: 60_000, // poll every 60s
+    queryKey: [...queryKeys.notifications.unreadCount, user?.id],
+    queryFn: () => notificationsApi.unreadCount(user!.id),
+    refetchInterval: 60_000,
+    enabled: !!user?.id,
   });
 
-  const unreadCount = unreadData?.count ?? 0;
+  const unreadCount = unreadData?.unreadCount ?? 0;
 
   // Close dropdown on outside click
   useEffect(() => {

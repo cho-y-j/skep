@@ -10,8 +10,8 @@ export enum UserRole {
 }
 
 export enum CompanyType {
-  SUPPLIER = "SUPPLIER",
-  BP = "BP",
+  SUPPLIER = "EQUIPMENT_SUPPLIER",
+  BP = "BP_COMPANY",
 }
 
 export enum CompanyStatus {
@@ -82,9 +82,12 @@ export interface Company {
   id: string;
   name: string;
   businessNumber: string;
-  type: CompanyType;
+  // 백엔드 필드는 companyType. type은 legacy alias.
+  companyType: CompanyType;
+  type?: CompanyType;
   status: CompanyStatus;
-  representativeName: string;
+  representative?: string; // 백엔드 실제 필드
+  representativeName?: string; // legacy
   phone: string;
   email: string;
   address: string;

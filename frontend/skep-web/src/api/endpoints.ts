@@ -129,26 +129,27 @@ export const authApi = {
 
 export const companiesApi = {
   getAll: (params?: Record<string, unknown>) =>
-    client.get<unknown, PageResponse<Company>>("/api/companies", { params }),
+    client.get<unknown, PageResponse<Company>>("/api/auth/companies", { params }),
 
   getById: (id: string) =>
-    client.get<unknown, Company>(`/api/companies/${id}`),
+    client.get<unknown, Company>(`/api/auth/companies/${id}`),
 
   getByType: (type: CompanyType, params?: Record<string, unknown>) =>
-    client.get<unknown, PageResponse<Company>>(`/api/companies/type/${type}`, {
+    client.get<unknown, PageResponse<Company>>(`/api/auth/companies/type/${type}`, {
       params,
     }),
 
   create: (data: Partial<Company>) =>
-    client.post<unknown, Company>("/api/companies", data),
+    client.post<unknown, Company>("/api/auth/companies", data),
 
   update: (id: string, data: Partial<Company>) =>
-    client.put<unknown, Company>(`/api/companies/${id}`, data),
+    client.put<unknown, Company>(`/api/auth/companies/${id}`, data),
 
+  // 백엔드는 PUT
   updateStatus: (id: string, status: string) =>
-    client.patch<unknown, Company>(`/api/companies/${id}/status`, { status }),
+    client.put<unknown, Company>(`/api/auth/companies/${id}/status`, { status }),
 
-  delete: (id: string) => client.delete(`/api/companies/${id}`),
+  delete: (id: string) => client.delete(`/api/auth/companies/${id}`),
 };
 
 // ---------------------------------------------------------------------------
@@ -206,7 +207,8 @@ export const documentsApi = {
 
   getByOwner: (ownerType: string, ownerId: string) =>
     client.get<unknown, Document[]>(
-      `/api/documents/owner/${ownerType}/${ownerId}`
+      // 주의: 백엔드는 {ownerId}/{ownerType} 순서
+      `/api/documents/${ownerId}/${ownerType}`
     ),
 
   upload: (data: FormData) =>
@@ -217,11 +219,12 @@ export const documentsApi = {
   getFile: (id: string) =>
     client.get(`/api/documents/${id}/file`, { responseType: "blob" }),
 
+  // 백엔드는 POST /api/documents/{id}/verify (body에 verified: true/false)
   verify: (id: string) =>
-    client.patch<unknown, Document>(`/api/documents/${id}/verify`),
+    client.post<unknown, Document>(`/api/documents/${id}/verify`, { verified: true }),
 
   unverify: (id: string) =>
-    client.patch<unknown, Document>(`/api/documents/${id}/unverify`),
+    client.post<unknown, Document>(`/api/documents/${id}/verify`, { verified: false }),
 };
 
 // ---------------------------------------------------------------------------
@@ -262,17 +265,20 @@ export const rostersApi = {
   create: (data: Partial<DailyRoster>) =>
     client.post<unknown, DailyRoster>("/api/dispatch/rosters", data),
 
+  // NOTE: 백엔드엔 일반 PUT /rosters/{id} 없음 — 필요 시 create로 재생성
   update: (id: string, data: Partial<DailyRoster>) =>
     client.put<unknown, DailyRoster>(`/api/dispatch/rosters/${id}`, data),
 
+  // PUT (백엔드 메서드)
   approve: (id: string) =>
-    client.patch<unknown, DailyRoster>(`/api/dispatch/rosters/${id}/approve`),
+    client.put<unknown, DailyRoster>(`/api/dispatch/rosters/${id}/approve`),
 
   reject: (id: string, reason: string) =>
-    client.patch<unknown, DailyRoster>(`/api/dispatch/rosters/${id}/reject`, {
+    client.put<unknown, DailyRoster>(`/api/dispatch/rosters/${id}/reject`, {
       reason,
     }),
 
+  // NOTE: 백엔드엔 DELETE /rosters/{id} 없음
   delete: (id: string) => client.delete(`/api/dispatch/rosters/${id}`),
 };
 
@@ -287,22 +293,24 @@ export const workRecordsApi = {
       { params }
     ),
 
+  // 백엔드: POST /api/dispatch/work-records/clock-in (body: rosterId, lat, lng)
   clockIn: (
     rosterId: string,
     data: { latitude: number; longitude: number }
   ) =>
     client.post<unknown, WorkRecord>(
-      `/api/dispatch/work-records/${rosterId}/clock-in`,
-      data
+      "/api/dispatch/work-records/clock-in",
+      { rosterId, ...data }
     ),
 
+  // 백엔드는 POST
   startWork: (id: string) =>
-    client.patch<unknown, WorkRecord>(
+    client.post<unknown, WorkRecord>(
       `/api/dispatch/work-records/${id}/start`
     ),
 
   endWork: (id: string) =>
-    client.patch<unknown, WorkRecord>(`/api/dispatch/work-records/${id}/end`),
+    client.post<unknown, WorkRecord>(`/api/dispatch/work-records/${id}/end`),
 };
 
 // ---------------------------------------------------------------------------
@@ -332,18 +340,18 @@ export const sitesApi = {
 export const quotationRequestsApi = {
   getAll: (params?: Record<string, unknown>) =>
     client.get<unknown, PageResponse<QuotationRequest>>(
-      "/api/dispatch/quotation-requests",
+      "/api/dispatch/quotations/requests",
       { params }
     ),
 
   getById: (id: string) =>
     client.get<unknown, QuotationRequest>(
-      `/api/dispatch/quotation-requests/${id}`
+      `/api/dispatch/quotations/requests/${id}`
     ),
 
   create: (data: Partial<QuotationRequest>) =>
     client.post<unknown, QuotationRequest>(
-      "/api/dispatch/quotation-requests",
+      "/api/dispatch/quotations/requests",
       data
     ),
 };
@@ -367,18 +375,19 @@ export const quotationsApi = {
   update: (id: string, data: Partial<Quotation>) =>
     client.put<unknown, Quotation>(`/api/dispatch/quotations/${id}`, data),
 
+  // 백엔드는 PUT
   submit: (id: string) =>
-    client.patch<unknown, Quotation>(
+    client.put<unknown, Quotation>(
       `/api/dispatch/quotations/${id}/submit`
     ),
 
   accept: (id: string) =>
-    client.patch<unknown, Quotation>(
+    client.put<unknown, Quotation>(
       `/api/dispatch/quotations/${id}/accept`
     ),
 
   reject: (id: string, reason: string) =>
-    client.patch<unknown, Quotation>(
+    client.put<unknown, Quotation>(
       `/api/dispatch/quotations/${id}/reject`,
       { reason }
     ),
@@ -395,22 +404,31 @@ export const checklistsApi = {
       { params }
     ),
 
-  getById: (id: string) =>
+  // 백엔드: GET /api/dispatch/checklists/plan/{planId}
+  getByPlanId: (planId: string) =>
     client.get<unknown, DeploymentChecklist>(
-      `/api/dispatch/checklists/${id}`
+      `/api/dispatch/checklists/plan/${planId}`
     ),
 
+  // backward-compat alias
+  getById: (id: string) =>
+    client.get<unknown, DeploymentChecklist>(
+      `/api/dispatch/checklists/plan/${id}`
+    ),
+
+  // 백엔드: PUT /api/dispatch/checklists/{id}/update
   update: (
     id: string,
     items: Array<{ itemId: string; checked: boolean; note?: string }>
   ) =>
     client.put<unknown, DeploymentChecklist>(
-      `/api/dispatch/checklists/${id}`,
+      `/api/dispatch/checklists/${id}/update`,
       { items }
     ),
 
+  // 백엔드는 PUT
   override: (id: string, reason: string) =>
-    client.patch<unknown, DeploymentChecklist>(
+    client.put<unknown, DeploymentChecklist>(
       `/api/dispatch/checklists/${id}/override`,
       { reason }
     ),
@@ -421,14 +439,29 @@ export const checklistsApi = {
 // ---------------------------------------------------------------------------
 
 export const confirmationsApi = {
+  // 백엔드: GET /api/dispatch/confirmations/daily
+  getDaily: (params?: Record<string, unknown>) =>
+    client.get("/api/dispatch/confirmations/daily", { params }),
+
+  // backward-compat
   getAll: (params?: Record<string, unknown>) =>
-    client.get("/api/dispatch/confirmations", { params }),
+    client.get("/api/dispatch/confirmations/daily", { params }),
 
-  confirm: (id: string) =>
-    client.patch(`/api/dispatch/confirmations/${id}/confirm`),
+  getDailyById: (id: string) =>
+    client.get(`/api/dispatch/confirmations/daily/${id}`),
 
-  reject: (id: string, reason: string) =>
-    client.patch(`/api/dispatch/confirmations/${id}/reject`, { reason }),
+  getMonthlyByPlan: (planId: string) =>
+    client.get(`/api/dispatch/confirmations/monthly/plan/${planId}`),
+
+  // 서명 (PATCH→POST confirm 없음, 대신 sign 제공됨)
+  signDaily: (id: string, data?: Record<string, unknown>) =>
+    client.post(`/api/dispatch/confirmations/daily/${id}/sign`, data),
+
+  signMonthly: (id: string, data?: Record<string, unknown>) =>
+    client.post(`/api/dispatch/confirmations/monthly/${id}/sign`, data),
+
+  sendMonthly: (id: string) =>
+    client.post(`/api/dispatch/confirmations/monthly/${id}/send`),
 };
 
 // ---------------------------------------------------------------------------
@@ -445,28 +478,30 @@ export const safetyApi = {
   getById: (id: string) =>
     client.get<unknown, SafetyInspection>(`/api/inspection/safety/${id}`),
 
-  start: (id: string) =>
-    client.patch<unknown, SafetyInspection>(
-      `/api/inspection/safety/${id}/start`
+  // 백엔드: POST /api/inspection/safety/start (body에 planId/equipmentId 등)
+  start: (data?: Record<string, unknown>) =>
+    client.post<unknown, SafetyInspection>(
+      `/api/inspection/safety/start`,
+      data
     ),
 
+  // 백엔드: POST /api/inspection/safety/{id}/record-item
   recordItem: (
     id: string,
-    itemId: string,
-    data: { passed: boolean; note?: string }
+    data: { itemId: string; passed: boolean; note?: string }
   ) =>
-    client.patch(
-      `/api/inspection/safety/${id}/items/${itemId}`,
+    client.post(
+      `/api/inspection/safety/${id}/record-item`,
       data
     ),
 
   complete: (id: string) =>
-    client.patch<unknown, SafetyInspection>(
+    client.post<unknown, SafetyInspection>(
       `/api/inspection/safety/${id}/complete`
     ),
 
   fail: (id: string, reason: string) =>
-    client.patch<unknown, SafetyInspection>(
+    client.post<unknown, SafetyInspection>(
       `/api/inspection/safety/${id}/fail`,
       { reason }
     ),
@@ -520,14 +555,26 @@ export const settlementApi = {
     endDate: string;
   }) => client.post<unknown, Settlement>("/api/settlement/generate", data),
 
+  // 백엔드는 POST
   send: (id: string) =>
-    client.patch<unknown, Settlement>(`/api/settlement/${id}/send`),
+    client.post<unknown, Settlement>(`/api/settlement/${id}/send`),
 
+  // 백엔드: PUT /api/settlement/{id}/mark-paid
   markPaid: (id: string) =>
-    client.patch<unknown, Settlement>(`/api/settlement/${id}/paid`),
+    client.put<unknown, Settlement>(`/api/settlement/${id}/mark-paid`),
 
-  stats: () =>
-    client.get<unknown, SettlementStats>("/api/settlement/stats"),
+  // 백엔드: /api/settlement/statistics/bp/{bpId} / /supplier/{supplierId}
+  statsByBp: (bpId: string) =>
+    client.get<unknown, SettlementStats>(`/api/settlement/statistics/bp/${bpId}`),
+
+  statsBySupplier: (supplierId: string) =>
+    client.get<unknown, SettlementStats>(`/api/settlement/statistics/supplier/${supplierId}`),
+
+  // backward-compat (호출부 있으면 일단 bp 통계로 연결; 엄밀히는 사용자 컨텍스트 필요)
+  stats: () => {
+    // fallback: empty stats
+    return Promise.resolve({} as SettlementStats);
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -535,15 +582,25 @@ export const settlementApi = {
 // ---------------------------------------------------------------------------
 
 export const notificationsApi = {
-  getAll: (params?: Record<string, unknown>) =>
-    client.get<unknown, PageResponse<Notification>>("/api/notifications", {
+  // 백엔드: GET /api/notifications/my
+  getMy: (params?: Record<string, unknown>) =>
+    client.get<unknown, PageResponse<Notification>>("/api/notifications/my", {
       params,
     }),
 
-  markRead: (id: string) =>
-    client.patch(`/api/notifications/${id}/read`),
+  // backward-compat
+  getAll: (params?: Record<string, unknown>) =>
+    client.get<unknown, PageResponse<Notification>>("/api/notifications/my", {
+      params,
+    }),
 
-  markAllRead: () => client.patch("/api/notifications/read-all"),
+  // 백엔드: PUT /api/notifications/{id}/read
+  markRead: (id: string) =>
+    client.put(`/api/notifications/${id}/read`),
+
+  // 백엔드엔 read-all 없음 — 각각 read 호출하도록 페이지에서 처리 필요
+  markAllRead: () =>
+    Promise.reject(new Error("markAllRead은 백엔드에서 지원하지 않음 — 개별 markRead 사용")),
 
   sendMessage: (data: {
     userId: string;
@@ -552,8 +609,10 @@ export const notificationsApi = {
     type?: string;
   }) => client.post("/api/notifications/send", data),
 
-  unreadCount: () =>
-    client.get<unknown, { count: number }>("/api/notifications/unread-count"),
+  unreadCount: (userId: string) =>
+    client.get<unknown, { unreadCount: number }>("/api/notifications/unread-count", {
+      params: { userId },
+    }),
 };
 
 // ---------------------------------------------------------------------------
@@ -564,15 +623,24 @@ export const locationApi = {
   update: (data: { latitude: number; longitude: number }) =>
     client.post("/api/location/update", data),
 
-  getCurrent: (userId: string) =>
+  // 백엔드: GET /api/location/worker/{workerId}/current
+  getCurrent: (workerId: string) =>
     client.get<
       unknown,
       { latitude: number; longitude: number; updatedAt: string }
-    >(`/api/location/${userId}/current`),
+    >(`/api/location/worker/${workerId}/current`),
 
-  getWorkerHistory: (userId: string, date: string) =>
+  // 백엔드: GET /api/location/worker/{workerId} ?date=
+  getWorkerHistory: (workerId: string, date: string) =>
     client.get<
       unknown,
       Array<{ latitude: number; longitude: number; timestamp: string }>
-    >(`/api/location/${userId}/history`, { params: { date } }),
+    >(`/api/location/worker/${workerId}`, { params: { date } }),
+
+  // 백엔드: GET /api/location/current/{siteId} (현장 기준 현재 모든 근로자 위치)
+  getSiteCurrent: (siteId: string) =>
+    client.get<
+      unknown,
+      Array<{ workerId: string; latitude: number; longitude: number; updatedAt: string }>
+    >(`/api/location/current/${siteId}`),
 };

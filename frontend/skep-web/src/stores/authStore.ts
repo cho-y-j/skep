@@ -12,10 +12,22 @@ interface AuthState {
   setUser: (user: User) => void;
 }
 
+// localStorage 에서 동기적으로 초기값 로드 — 새로고침 시 AuthGuard 가 token:null 로 잠깐 보고
+// 로그인 페이지로 리다이렉트해버리는 것 방지
+function loadInitial(): Pick<AuthState, "user" | "token" | "refreshToken"> {
+  try {
+    const token = localStorage.getItem("skep_token");
+    const refreshToken = localStorage.getItem("skep_refresh_token");
+    const userJson = localStorage.getItem("skep_user");
+    if (token && userJson) {
+      return { token, refreshToken, user: JSON.parse(userJson) as User };
+    }
+  } catch { /* noop */ }
+  return { user: null, token: null, refreshToken: null };
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: null,
-  refreshToken: null,
+  ...loadInitial(),
 
   login: (data) => {
     localStorage.setItem("skep_token", data.token);

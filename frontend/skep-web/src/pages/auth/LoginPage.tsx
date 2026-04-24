@@ -32,8 +32,19 @@ export function LoginPage() {
 
   const onSubmit = async (data: LoginForm) => {
     try {
-      const response = await authApi.login(data);
-      storeLogin(response);
+      const response = await authApi.login(data) as any;
+      // 서버 응답은 snake_case(access_token/refresh_token) + user 필드 flat
+      // 스토어 기대 포맷은 camelCase + user 중첩 → 여기서 변환
+      storeLogin({
+        token: response.access_token ?? response.token,
+        refreshToken: response.refresh_token ?? response.refreshToken,
+        user: response.user ?? {
+          id: response.user_id,
+          email: response.email,
+          name: response.name,
+          role: response.role,
+        },
+      });
 
       toast.success("로그인 성공");
 

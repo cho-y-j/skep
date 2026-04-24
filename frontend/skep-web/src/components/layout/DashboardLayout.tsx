@@ -18,6 +18,7 @@ import {
   Search,
   Eye,
   ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
 import { Sidebar, type MenuItem } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -39,6 +40,8 @@ const ADMIN_MENU: MenuItem[] = [
     ],
   },
   { label: "문서 관리", path: "/documents", icon: FileText },
+  { label: "서류 검증", path: "/verification", icon: ShieldCheck },
+  { label: "작업계획서 생성", path: "/worksheet/new", icon: ClipboardList },
   {
     label: "배치 관리",
     icon: CalendarDays,
@@ -114,6 +117,7 @@ const BP_MENU: MenuItem[] = [
   { label: "견적 관리", path: "/bp/quotations", icon: FileText },
   { label: "체크리스트", path: "/bp/checklist", icon: ShieldCheck },
   { label: "직원 관리", path: "/bp/employees", icon: Users },
+  { label: "작업계획서 생성", path: "/bp/worksheet/new", icon: ClipboardList },
 ];
 
 // ---------------------------------------------------------------------------
