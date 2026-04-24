@@ -24,7 +24,8 @@ public class VerificationService {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${verify.server-url:${VERIFY_SERVER_URL:http://verify-main-api:8080}}")
+    // 우선 순위: verify.server-url > VERIFY_API_BASE_URL(compose) > VERIFY_SERVER_URL > 기본값
+    @Value("${verify.server-url:${VERIFY_API_BASE_URL:${VERIFY_SERVER_URL:https://sk.on1.kr}}}")
     private String verifyServerUrl;
 
     @Value("${verify.api-key:${VERIFY_API_KEY:}}")
@@ -113,13 +114,29 @@ public class VerificationService {
      */
     private String resolveEndpoint(String documentType) {
         if (documentType == null) return null;
-        return switch (documentType.toUpperCase()) {
+        String t = documentType.toUpperCase();
+        // 한국어 타입 → verify-server endpoint
+        if (documentType.contains("운전면허") || documentType.contains("조종사면허")) return "/api/verify/rims/license";
+        if (documentType.contains("사업자")) return "/api/verify/biz";
+        if (documentType.contains("화물운송")) return "/api/verify/cargo";
+        if (documentType.contains("안전보건교육") || documentType.contains("조종사안전교육") || documentType.contains("KOSHA")) return "/api/verify/kosha";
+        // English enum fallback
+        return switch (t) {
             case "BUSINESS_LICENSE", "BUSINESS_REGISTRATION" -> "/api/verify/biz";
             case "DRIVER_LICENSE" -> "/api/verify/rims/license";
             case "CARGO_LICENSE", "CARGO_CERTIFICATE" -> "/api/verify/cargo";
             case "KOSHA_CERTIFICATE", "SAFETY_TRAINING" -> "/api/verify/kosha";
             default -> null;
         };
+    }
+
+    private String normalizeType(String documentType) {
+        if (documentType == null) return "";
+        if (documentType.contains("운전면허") || documentType.contains("조종사면허")) return "DRIVER_LICENSE";
+        if (documentType.contains("사업자")) return "BUSINESS_REGISTRATION";
+        if (documentType.contains("화물운송")) return "CARGO_LICENSE";
+        if (documentType.contains("안전보건교육") || documentType.contains("조종사안전교육")) return "KOSHA_CERTIFICATE";
+        return documentType.toUpperCase();
     }
 
     /**
@@ -134,7 +151,7 @@ public class VerificationService {
         }
 
         // Map fields to what the verify-server expects
-        switch (documentType.toUpperCase()) {
+        switch (normalizeType(documentType)) {
             case "BUSINESS_LICENSE", "BUSINESS_REGISTRATION" -> {
                 body.put("bizNo", documentNumber);
                 if (additionalParams != null) {

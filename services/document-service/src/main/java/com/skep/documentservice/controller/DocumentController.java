@@ -92,6 +92,40 @@ public class DocumentController {
         return ResponseEntity.ok(document);
     }
 
+    // 관리자가 OCR 결과 없이 바로 verified=true로 전환 (body: {"verified":true|false})
+    @PostMapping("/{id}/mark-verified")
+    public ResponseEntity<DocumentResponse> markVerified(
+            @PathVariable UUID id,
+            @RequestBody(required = false) java.util.Map<String, Boolean> body) {
+        boolean value = body == null || body.get("verified") == null ? true : body.get("verified");
+        DocumentResponse document = documentService.markVerified(id, value);
+        return ResponseEntity.ok(document);
+    }
+
+    // 해당 문서의 이미지 파일을 가져와 실제 OCR 실행 (verify-api 기반 Google Vision)
+    @PostMapping("/{id}/run-ocr")
+    public ResponseEntity<com.fasterxml.jackson.databind.JsonNode> runOcr(@PathVariable UUID id) throws IOException {
+        com.fasterxml.jackson.databind.JsonNode result = documentService.runOcrOnDocument(id);
+        return ResponseEntity.ok(result);
+    }
+
+    // OCR 결과를 조회용으로 반환 (편집 UI에 뿌릴 데이터)
+    @GetMapping("/{id}/ocr-result")
+    public ResponseEntity<java.util.Map<String, Object>> getOcrResult(@PathVariable UUID id) {
+        java.util.Map<String, Object> m = documentService.getOcrResult(id);
+        return ResponseEntity.ok(m);
+    }
+
+    // 관리자가 편집한 OCR 필드를 저장하며 검증도 함께 처리
+    // body: { extractedFields: {...}, verified: true|false }
+    @PostMapping("/{id}/save-ocr")
+    public ResponseEntity<DocumentResponse> saveOcr(
+            @PathVariable UUID id,
+            @RequestBody com.fasterxml.jackson.databind.JsonNode body) {
+        DocumentResponse resp = documentService.saveOcrAndVerify(id, body);
+        return ResponseEntity.ok(resp);
+    }
+
     @PostMapping("/{id}/verify")
     public ResponseEntity<DocumentResponse> verifyDocument(@PathVariable UUID id) {
         DocumentResponse document = documentService.verifyDocument(id);
