@@ -11,6 +11,30 @@ import { LoginPage } from "@/pages/auth/LoginPage";
 // Admin pages
 // ---------------------------------------------------------------------------
 const AdminDashboard = lazy(() => import("@/pages/admin/DashboardHome"));
+const AdminCompanyList = lazy(() => import("@/pages/admin/CompanyList"));
+const AdminUserManagement = lazy(() => import("@/pages/admin/UserManagement"));
+const AdminBpManagement = lazy(() => import("@/pages/admin/BpManagement"));
+const AdminEquipmentStatus = lazy(() => import("@/pages/admin/EquipmentStatus"));
+const AdminEquipmentTypeSettings = lazy(() => import("@/pages/admin/EquipmentTypeSettings"));
+const AdminPersonnelTypeSettings = lazy(() => import("@/pages/admin/PersonnelTypeSettings"));
+const AdminDocumentManagement = lazy(() => import("@/pages/admin/DocumentManagement"));
+const AdminDocumentTypeManagement = lazy(() => import("@/pages/admin/DocumentTypeManagement"));
+const AdminDeploymentManagement = lazy(() => import("@/pages/admin/DeploymentManagement"));
+const AdminSiteManagement = lazy(() => import("@/pages/admin/SiteManagement"));
+const AdminQuotationManagement = lazy(() => import("@/pages/admin/QuotationManagement"));
+const AdminChecklistManagement = lazy(() => import("@/pages/admin/ChecklistManagement"));
+const AdminInspectionManagement = lazy(() => import("@/pages/admin/InspectionManagement"));
+const AdminSettlement = lazy(() => import("@/pages/admin/Settlement"));
+const AdminStatistics = lazy(() => import("@/pages/admin/Statistics"));
+const AdminNotifications = lazy(() => import("@/pages/admin/Notifications"));
+const AdminVerification = lazy(() => import("@/pages/admin/Verification"));
+const AdminSupplierDocVerification = lazy(() => import("@/pages/admin/SupplierDocVerification"));
+
+// ---------------------------------------------------------------------------
+// Shared pages
+// ---------------------------------------------------------------------------
+const WorkPlanCreate = lazy(() => import("@/pages/shared/WorkPlanCreate"));
+const WorkPlanEditor = lazy(() => import("@/pages/shared/WorkPlanEditor"));
 
 // ---------------------------------------------------------------------------
 // Supplier pages
@@ -99,6 +123,11 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 
+        {/* 편집기는 DashboardLayout 밖 최상위로 — OnlyOffice가 주입하는 DOM이
+            사이드바/탑바가 있는 레이아웃 리렌더 주기와 충돌해서 insertBefore 에러가 남 */}
+        <Route path="/worksheet/edit/:sessionId" element={<AuthGuard><WorkPlanEditor /></AuthGuard>} />
+        <Route path="/bp/worksheet/edit/:sessionId" element={<AuthGuard><WorkPlanEditor /></AuthGuard>} />
+
         <Route
           path="/*"
           element={
@@ -109,6 +138,30 @@ function AppRoutes() {
         >
           {/* ---- Admin routes ---- */}
           <Route index element={<AdminDashboard />} />
+          <Route path="worksheet/new" element={<WorkPlanCreate />} />
+          <Route path="companies" element={<AdminCompanyList />} />
+          <Route path="users" element={<AdminUserManagement />} />
+          <Route path="bp" element={<AdminBpManagement />} />
+          <Route path="equipment" element={<AdminEquipmentStatus />} />
+          <Route path="equipment/persons" element={<AdminEquipmentStatus />} />
+          <Route path="equipment/types" element={<AdminEquipmentTypeSettings />} />
+          <Route path="personnel/types" element={<AdminPersonnelTypeSettings />} />
+          <Route path="documents" element={<AdminDocumentManagement />} />
+          <Route path="documents/types" element={<AdminDocumentTypeManagement />} />
+          <Route path="dispatch/plans" element={<AdminDeploymentManagement />} />
+          <Route path="dispatch/rosters" element={<AdminDeploymentManagement />} />
+          <Route path="dispatch/work-records" element={<AdminDeploymentManagement />} />
+          <Route path="dispatch/sites" element={<AdminSiteManagement />} />
+          <Route path="dispatch/quotations" element={<AdminQuotationManagement />} />
+          <Route path="dispatch/checklists" element={<AdminChecklistManagement />} />
+          <Route path="inspection/safety" element={<AdminInspectionManagement />} />
+          <Route path="inspection/maintenance" element={<AdminInspectionManagement />} />
+          <Route path="settlement" element={<AdminSettlement />} />
+          <Route path="statistics" element={<AdminStatistics />} />
+          <Route path="notifications" element={<AdminNotifications />} />
+          <Route path="verification" element={<AdminSupplierDocVerification />} />
+          <Route path="verification/legacy" element={<AdminVerification />} />
+          <Route path="location" element={<AdminDashboard />} />
 
           {/* ---- Supplier routes ---- */}
           <Route path="supplier" element={<SupplierDashboard />} />
@@ -140,6 +193,7 @@ function AppRoutes() {
           <Route path="bp/quotations" element={<BpQuotationManagement />} />
           <Route path="bp/checklist" element={<BpChecklist />} />
           <Route path="bp/employees" element={<BpEmployeeManagement />} />
+          <Route path="bp/worksheet/new" element={<WorkPlanCreate />} />
 
           {/* ---- Worker routes ---- */}
           <Route path="worker" element={<WorkerDashboard />} />

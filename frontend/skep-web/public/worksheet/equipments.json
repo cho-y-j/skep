@@ -1,0 +1,527 @@
+[
+  {
+    "id": "38e28c64-91c2-4808-bc51-48740b8ddc0d",
+    "equipmentType": "고소작업차",
+    "vehicleNo": "경기99사9639",
+    "name": "45m 고소작업차",
+    "model": "SKY450-NMA",
+    "manufacturer": "센코어테크",
+    "year": "2022",
+    "upperPartYear": "2022",
+    "serialNo": "SKC-2022-0450",
+    "capacity": "최대인양중량 300kg / 작업높이 45m",
+    "insuranceExpiry": "2026-10-18",
+    "inspectionExpiry": "2027-04-21",
+    "ndtExpiry": "2026-06-20",
+    "documents": [
+      {
+        "id": "b044b08d-3039-4bd3-bcf1-27dd1178e212",
+        "originalName": "mock-등록원부-경기99사9639.jpg",
+        "storageKey": "dafa3065-d827-4996-9723-f1757687c58d-mock-등록원부-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 71252,
+        "uploadedAt": "2026-04-21T05:34:57.291Z",
+        "category": "건설기계등록증",
+        "expiresAt": "2028-05-30"
+      },
+      {
+        "id": "a518e993-a66f-4374-9ffe-499457d5e140",
+        "originalName": "mock-등록원부-경기99사9639.jpg",
+        "storageKey": "fede350c-a60f-4edb-9a08-f0ea879fcdb7-mock-등록원부-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 71252,
+        "uploadedAt": "2026-04-21T05:34:57.305Z",
+        "category": "등록원부",
+        "expiresAt": "2028-05-30"
+      },
+      {
+        "id": "ede4c30c-325f-4db4-aef6-103f99b4030c",
+        "originalName": "사업자등록증.jpg",
+        "storageKey": "ced14d84-7c39-4ad7-b754-810288b617d9-사업자등록증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4092593,
+        "uploadedAt": "2026-04-21T05:34:57.385Z",
+        "category": "사업자등록증"
+      },
+      {
+        "id": "6138da87-227f-4cea-a33b-46118db688dd",
+        "originalName": "mock-안전인증서-SKY450-NMA.jpg",
+        "storageKey": "cfd26aa8-6041-4eb3-97ed-12119778a4ea-mock-안전인증서-SKY450-NMA.jpg",
+        "mimeType": "image/jpeg",
+        "size": 65175,
+        "uploadedAt": "2026-04-21T05:34:57.395Z",
+        "category": "안전인증서",
+        "expiresAt": "2027-05-14"
+      },
+      {
+        "id": "19d9c33b-de45-42d5-9042-7d755d763dfe",
+        "originalName": "mock-제원표-SKY450-NMA.jpg",
+        "storageKey": "de928ae9-ce15-43c6-928a-f972324d87c1-mock-제원표-SKY450-NMA.jpg",
+        "mimeType": "image/jpeg",
+        "size": 61387,
+        "uploadedAt": "2026-04-21T05:34:57.406Z",
+        "category": "장비제원표"
+      },
+      {
+        "id": "67a9a59b-b6aa-4d56-84c1-73a57d05a66d",
+        "originalName": "mock-보험증권-경기99사9639.jpg",
+        "storageKey": "a743971a-b62c-4fd5-a46a-9b8a5123f54a-mock-보험증권-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 68152,
+        "uploadedAt": "2026-04-21T05:34:57.417Z",
+        "category": "자동차보험증권",
+        "expiresAt": "2026-10-18"
+      },
+      {
+        "id": "a89157cd-d2d1-4009-bf64-ebcda9dbc0ff",
+        "originalName": "mock-비파괴자분-경기99사9639.jpg",
+        "storageKey": "40bde0de-6941-447f-b3d6-5934813613bd-mock-비파괴자분-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 76484,
+        "uploadedAt": "2026-04-21T05:34:57.429Z",
+        "category": "비파괴검사서(자분탐상)",
+        "expiresAt": "2026-06-20"
+      },
+      {
+        "id": "85b13b7a-74de-4bdc-82e3-8ff47328cbb9",
+        "originalName": "mock-운영계획-용인Cluster1기구축공사.jpg",
+        "storageKey": "a1398f66-c147-4a74-b0de-997af758008c-mock-운영계획-용인Cluster1기구축공사.jpg",
+        "mimeType": "image/jpeg",
+        "size": 62437,
+        "uploadedAt": "2026-04-21T05:34:57.437Z",
+        "category": "현장운영계획"
+      },
+      {
+        "id": "70e0f961-5db5-4e7b-aaa3-f6a1553ed6e9",
+        "originalName": "mock-점검신청서-경기99사9639.jpg",
+        "storageKey": "6d9faeb1-c69d-43b2-a999-6af9ee941c58-mock-점검신청서-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 67617,
+        "uploadedAt": "2026-04-21T05:34:57.448Z",
+        "category": "장비점검신청서"
+      },
+      {
+        "id": "4a0a31ad-2565-4b9d-864a-a7765ebdbb60",
+        "originalName": "mock-반입전검사-경기99사9639.jpg",
+        "storageKey": "280aaf3f-9f96-478d-b82b-90aa39dcb54b-mock-반입전검사-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 70413,
+        "uploadedAt": "2026-04-21T05:34:57.457Z",
+        "category": "반입전검사서류"
+      },
+      {
+        "id": "0637ba33-de8a-474b-b74c-c699655e7ee0",
+        "originalName": "mock-붐수리-경기99사9639.jpg",
+        "storageKey": "08b6d7b1-c1a0-4dc1-ac15-121275ad899d-mock-붐수리-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 71521,
+        "uploadedAt": "2026-04-21T05:34:57.466Z",
+        "category": "붐수리보고서",
+        "expiresAt": "2027-03-09"
+      },
+      {
+        "id": "221dfe3f-f198-46cc-a97a-baf958b01ea6",
+        "originalName": "고소작업차.jpg",
+        "storageKey": "8e6581fe-a8c6-446f-b413-ef0e39e2d51e-고소작업차.jpg",
+        "mimeType": "image/jpeg",
+        "size": 8742,
+        "uploadedAt": "2026-04-21T05:34:57.475Z",
+        "category": "장비실사사진"
+      },
+      {
+        "id": "2bd7828d-747d-49b4-8099-4dc2fe269fb3",
+        "originalName": "mock-작업배치도-용인Cluster1기구축공사.jpg",
+        "storageKey": "f7fd2183-2aec-41aa-a09f-156b8d66b81a-mock-작업배치도-용인Cluster1기구축공사.jpg",
+        "mimeType": "image/jpeg",
+        "size": 58988,
+        "uploadedAt": "2026-04-21T05:34:57.485Z",
+        "category": "작업배치도"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.485Z"
+  },
+  {
+    "id": "bcc03af9-8c29-4ba2-bdde-ff2784beb44a",
+    "equipmentType": "콘크리트펌프카",
+    "vehicleNo": "서울88바7412",
+    "name": "42m 콘크리트 펌프카",
+    "model": "CP-4200",
+    "manufacturer": "한울중공업",
+    "year": "2020",
+    "upperPartYear": "2020",
+    "serialNo": "HW-2020-0842",
+    "capacity": "최대 이송높이 42m / 시간당 160㎥",
+    "insuranceExpiry": "2026-08-19",
+    "inspectionExpiry": "2027-02-15",
+    "ndtExpiry": "2026-09-18",
+    "documents": [
+      {
+        "id": "c23099ee-2722-4f90-9713-55d10bf3dac0",
+        "originalName": "mock-등록원부-서울88바7412.jpg",
+        "storageKey": "e2ad6867-a086-4ac7-ba6f-003ac19f51d5-mock-등록원부-서울88바7412.jpg",
+        "mimeType": "image/jpeg",
+        "size": 71486,
+        "uploadedAt": "2026-04-21T05:34:57.495Z",
+        "category": "건설기계등록증",
+        "expiresAt": "2028-05-30"
+      },
+      {
+        "id": "5cd8c2cb-c0a8-4636-bf38-5d7f25dc8464",
+        "originalName": "사업자등록증.jpg",
+        "storageKey": "f576fc70-f517-4189-9191-b9b004baba98-사업자등록증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4092593,
+        "uploadedAt": "2026-04-21T05:34:57.563Z",
+        "category": "사업자등록증"
+      },
+      {
+        "id": "04b59d17-88c6-4f25-a0a7-845387282c95",
+        "originalName": "mock-안전인증서-CP-4200.jpg",
+        "storageKey": "575819ce-d4a6-4508-85ff-da25b417b87f-mock-안전인증서-CP-4200.jpg",
+        "mimeType": "image/jpeg",
+        "size": 65564,
+        "uploadedAt": "2026-04-21T05:34:57.575Z",
+        "category": "안전인증서",
+        "expiresAt": "2025-05-14"
+      },
+      {
+        "id": "c328a186-6f57-4ec6-afef-144001ad491f",
+        "originalName": "mock-제원표-CP-4200.jpg",
+        "storageKey": "4e772c92-7345-400a-9c40-eeb1df6d074e-mock-제원표-CP-4200.jpg",
+        "mimeType": "image/jpeg",
+        "size": 62042,
+        "uploadedAt": "2026-04-21T05:34:57.583Z",
+        "category": "장비제원표"
+      },
+      {
+        "id": "7d1e73a5-0731-44f2-bbe0-3649c331f793",
+        "originalName": "mock-보험증권-서울88바7412.jpg",
+        "storageKey": "7036192d-aae1-4225-85c2-570fc66b0530-mock-보험증권-서울88바7412.jpg",
+        "mimeType": "image/jpeg",
+        "size": 68451,
+        "uploadedAt": "2026-04-21T05:34:57.593Z",
+        "category": "자동차보험증권",
+        "expiresAt": "2026-08-19"
+      },
+      {
+        "id": "2c3ff7db-32f0-4020-8f25-cc71d64dab77",
+        "originalName": "mock-비파괴자분-서울88바7412.jpg",
+        "storageKey": "29e4afda-7189-4d14-8007-d6d99c3f8d52-mock-비파괴자분-서울88바7412.jpg",
+        "mimeType": "image/jpeg",
+        "size": 77014,
+        "uploadedAt": "2026-04-21T05:34:57.604Z",
+        "category": "비파괴검사서(자분탐상)",
+        "expiresAt": "2026-09-18"
+      },
+      {
+        "id": "b405a33e-6e5a-4b41-afa1-874c9574034d",
+        "originalName": "mock-운영계획-용인Cluster1기구축공사.jpg",
+        "storageKey": "3a27fbb1-967b-41f5-a935-4e00c3ee6776-mock-운영계획-용인Cluster1기구축공사.jpg",
+        "mimeType": "image/jpeg",
+        "size": 62437,
+        "uploadedAt": "2026-04-21T05:34:57.615Z",
+        "category": "현장운영계획"
+      },
+      {
+        "id": "aa6253cb-1418-4137-b28f-c329c6503398",
+        "originalName": "mock-점검신청서-서울88바7412.jpg",
+        "storageKey": "0382f91b-1ea1-4362-89ab-bc0f847764a9-mock-점검신청서-서울88바7412.jpg",
+        "mimeType": "image/jpeg",
+        "size": 67799,
+        "uploadedAt": "2026-04-21T05:34:57.625Z",
+        "category": "장비점검신청서"
+      },
+      {
+        "id": "b31b2e10-2ec0-4bbb-af74-e7a3e7925e5d",
+        "originalName": "mock-반입전검사-서울88바7412.jpg",
+        "storageKey": "32335fc8-7d84-439c-aa57-90d42e71ea20-mock-반입전검사-서울88바7412.jpg",
+        "mimeType": "image/jpeg",
+        "size": 70852,
+        "uploadedAt": "2026-04-21T05:34:57.634Z",
+        "category": "반입전검사서류"
+      },
+      {
+        "id": "ba22f919-54f5-4eaf-a1dc-987a28363c2b",
+        "originalName": "고소작업차.jpg",
+        "storageKey": "c3ebfe6d-45a3-49f5-a567-c1f9d0a0cad1-고소작업차.jpg",
+        "mimeType": "image/jpeg",
+        "size": 8742,
+        "uploadedAt": "2026-04-21T05:34:57.643Z",
+        "category": "장비실사사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.644Z"
+  },
+  {
+    "id": "45074d30-f12c-4a6a-a95a-57b28beb17c9",
+    "equipmentType": "기중기",
+    "vehicleNo": "인천32마1853",
+    "name": "50ton 크레인",
+    "model": "HGC-500",
+    "manufacturer": "현대건기",
+    "year": "2016",
+    "upperPartYear": "2016",
+    "serialNo": "HGC-2016-0050",
+    "capacity": "최대 인양 50ton / 붐 40m",
+    "insuranceExpiry": "2026-05-06",
+    "inspectionExpiry": "2026-11-07",
+    "ndtExpiry": "2026-06-05",
+    "documents": [
+      {
+        "id": "91103267-f27f-470d-bbac-0a5eb898938c",
+        "originalName": "mock-등록원부-인천32마1853.jpg",
+        "storageKey": "e00cfd17-1249-40c3-8edc-64053463ccf6-mock-등록원부-인천32마1853.jpg",
+        "mimeType": "image/jpeg",
+        "size": 70272,
+        "uploadedAt": "2026-04-21T05:34:57.653Z",
+        "category": "건설기계등록증",
+        "expiresAt": "2028-05-30"
+      },
+      {
+        "id": "1077a2fd-fb34-45d5-9412-5d1bc1282fc7",
+        "originalName": "mock-등록원부-인천32마1853.jpg",
+        "storageKey": "d391b777-fc10-446e-bcfc-a2bf44788cce-mock-등록원부-인천32마1853.jpg",
+        "mimeType": "image/jpeg",
+        "size": 70272,
+        "uploadedAt": "2026-04-21T05:34:57.663Z",
+        "category": "등록원부",
+        "expiresAt": "2028-05-30"
+      },
+      {
+        "id": "db6173e4-f03f-46d7-acd4-c88eee1d7c15",
+        "originalName": "사업자등록증.jpg",
+        "storageKey": "cec346f3-c690-4674-bb83-1322fa83366c-사업자등록증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4092593,
+        "uploadedAt": "2026-04-21T05:34:57.740Z",
+        "category": "사업자등록증"
+      },
+      {
+        "id": "5231eda5-806c-4f0d-8ccb-7ddf07c0bbea",
+        "originalName": "mock-안전인증서-HGC-500.jpg",
+        "storageKey": "d6a2bcbe-4ee9-4177-bc80-a631fefa1a56-mock-안전인증서-HGC-500.jpg",
+        "mimeType": "image/jpeg",
+        "size": 64091,
+        "uploadedAt": "2026-04-21T05:34:57.752Z",
+        "category": "안전인증서",
+        "expiresAt": "2021-05-14"
+      },
+      {
+        "id": "ff46764d-6c97-4761-b461-2e4d984f6611",
+        "originalName": "mock-제원표-HGC-500.jpg",
+        "storageKey": "ad209956-cabd-4d2f-8d41-0007c09b7121-mock-제원표-HGC-500.jpg",
+        "mimeType": "image/jpeg",
+        "size": 60143,
+        "uploadedAt": "2026-04-21T05:34:57.768Z",
+        "category": "장비제원표"
+      },
+      {
+        "id": "9338305b-bd3f-4d52-a621-46bba087a0f8",
+        "originalName": "mock-보험증권-인천32마1853.jpg",
+        "storageKey": "5f453c11-4ec8-4e58-bc90-f11b994d63f4-mock-보험증권-인천32마1853.jpg",
+        "mimeType": "image/jpeg",
+        "size": 68010,
+        "uploadedAt": "2026-04-21T05:34:57.780Z",
+        "category": "자동차보험증권",
+        "expiresAt": "2026-05-06"
+      },
+      {
+        "id": "1cd2fae4-a5b8-4e24-87ed-5af67b50900a",
+        "originalName": "mock-비파괴자분-인천32마1853.jpg",
+        "storageKey": "ad151a6e-a426-4817-8f0c-77c811c4e007-mock-비파괴자분-인천32마1853.jpg",
+        "mimeType": "image/jpeg",
+        "size": 76203,
+        "uploadedAt": "2026-04-21T05:34:57.791Z",
+        "category": "비파괴검사서(자분탐상)",
+        "expiresAt": "2026-06-05"
+      },
+      {
+        "id": "5305e19e-beb1-4d4c-b0fa-5501418d765c",
+        "originalName": "mock-비파괴초음파-인천32마1853.jpg",
+        "storageKey": "9892faa9-3140-4e1a-8ad7-8bd399614513-mock-비파괴초음파-인천32마1853.jpg",
+        "mimeType": "image/jpeg",
+        "size": 67948,
+        "uploadedAt": "2026-04-21T05:34:57.803Z",
+        "category": "비파괴검사서(초음파)",
+        "expiresAt": "2026-06-05"
+      },
+      {
+        "id": "c4bc0f7c-15a2-4aa5-94ee-158f9fc1612b",
+        "originalName": "mock-운영계획-용인Cluster1기구축공사.jpg",
+        "storageKey": "2186b44e-06ba-4be0-add2-2d99f21746a6-mock-운영계획-용인Cluster1기구축공사.jpg",
+        "mimeType": "image/jpeg",
+        "size": 62437,
+        "uploadedAt": "2026-04-21T05:34:57.812Z",
+        "category": "현장운영계획"
+      },
+      {
+        "id": "55e6c406-fce9-478e-ba63-29ec445aac13",
+        "originalName": "mock-점검신청서-인천32마1853.jpg",
+        "storageKey": "a45fa1f1-07bf-4e5a-87e7-8eb60a28c040-mock-점검신청서-인천32마1853.jpg",
+        "mimeType": "image/jpeg",
+        "size": 67387,
+        "uploadedAt": "2026-04-21T05:34:57.823Z",
+        "category": "장비점검신청서"
+      },
+      {
+        "id": "55ad529b-39d6-47aa-b6e1-fae42d3dd170",
+        "originalName": "mock-반입전검사-인천32마1853.jpg",
+        "storageKey": "167cedb7-556e-42d4-b284-6ab387f4242f-mock-반입전검사-인천32마1853.jpg",
+        "mimeType": "image/jpeg",
+        "size": 70119,
+        "uploadedAt": "2026-04-21T05:34:57.835Z",
+        "category": "반입전검사서류"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.835Z"
+  },
+  {
+    "id": "272ba479-c072-4798-b8bd-ba23e4be4a9b",
+    "equipmentType": "고소작업차",
+    "vehicleNo": "경기33다7721",
+    "name": "30m 고소작업차",
+    "model": "SKY300-B",
+    "manufacturer": "동해중기",
+    "year": "2021",
+    "upperPartYear": "2021",
+    "serialNo": "DH-2021-0300",
+    "capacity": "최대인양중량 200kg / 작업높이 30m",
+    "insuranceExpiry": "2026-07-20",
+    "inspectionExpiry": "2026-09-18",
+    "ndtExpiry": "2026-05-21",
+    "documents": [
+      {
+        "id": "46300696-a6c8-48e2-a83a-615a850ec5e8",
+        "originalName": "mock-등록원부-경기99사9639.jpg",
+        "storageKey": "707f6ac9-261d-4874-b327-a5fdee15f802-mock-등록원부-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 71252,
+        "uploadedAt": "2026-04-21T05:34:57.844Z",
+        "category": "건설기계등록증",
+        "expiresAt": "2028-05-30"
+      },
+      {
+        "id": "fd5b82c4-e32e-4c46-b26f-a90deeb441a7",
+        "originalName": "mock-등록원부-경기99사9639.jpg",
+        "storageKey": "709ae4b4-4c2e-4b43-b173-65c16b8eeb30-mock-등록원부-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 71252,
+        "uploadedAt": "2026-04-21T05:34:57.857Z",
+        "category": "등록원부",
+        "expiresAt": "2028-05-30"
+      },
+      {
+        "id": "46e34550-d0cb-4351-af6c-162847041003",
+        "originalName": "사업자등록증.jpg",
+        "storageKey": "3f04c764-170e-4114-a176-8b2df7eafd97-사업자등록증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4092593,
+        "uploadedAt": "2026-04-21T05:34:57.917Z",
+        "category": "사업자등록증"
+      },
+      {
+        "id": "d6cff6a3-4dc8-4ec3-a36e-00b19866f3d0",
+        "originalName": "mock-안전인증서-SKY450-NMA.jpg",
+        "storageKey": "105ac6b8-fe09-4536-8579-fc499535c326-mock-안전인증서-SKY450-NMA.jpg",
+        "mimeType": "image/jpeg",
+        "size": 65175,
+        "uploadedAt": "2026-04-21T05:34:57.925Z",
+        "category": "안전인증서",
+        "expiresAt": "2027-01-15"
+      },
+      {
+        "id": "f42cc6f6-1e54-48e8-b90e-577851705c88",
+        "originalName": "mock-제원표-SKY450-NMA.jpg",
+        "storageKey": "98711c11-d825-4986-8e70-cfcf4a47acb1-mock-제원표-SKY450-NMA.jpg",
+        "mimeType": "image/jpeg",
+        "size": 61387,
+        "uploadedAt": "2026-04-21T05:34:57.934Z",
+        "category": "장비제원표"
+      },
+      {
+        "id": "dd61d1b0-b611-434f-9e55-5de463d42562",
+        "originalName": "mock-보험증권-경기99사9639.jpg",
+        "storageKey": "d9de66b9-f86c-44c0-b54f-a5ce79ce62fa-mock-보험증권-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 68152,
+        "uploadedAt": "2026-04-21T05:34:57.943Z",
+        "category": "자동차보험증권",
+        "expiresAt": "2026-07-20"
+      },
+      {
+        "id": "815559af-84d2-4892-997b-90aa237ab48d",
+        "originalName": "mock-비파괴자분-경기99사9639.jpg",
+        "storageKey": "f734122b-bea3-49c8-ab1a-b45aac21cfd3-mock-비파괴자분-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 76484,
+        "uploadedAt": "2026-04-21T05:34:57.953Z",
+        "category": "비파괴검사서(자분탐상)",
+        "expiresAt": "2026-05-21"
+      },
+      {
+        "id": "c8e3196d-9e4f-4b82-be75-ed7b243a4eb2",
+        "originalName": "mock-운영계획-용인Cluster1기구축공사.jpg",
+        "storageKey": "6b2be79d-0744-455a-8fb6-f6e87fdfdf08-mock-운영계획-용인Cluster1기구축공사.jpg",
+        "mimeType": "image/jpeg",
+        "size": 62437,
+        "uploadedAt": "2026-04-21T05:34:57.961Z",
+        "category": "현장운영계획"
+      },
+      {
+        "id": "c870dc01-bd28-40f4-99dd-1592ade39443",
+        "originalName": "mock-점검신청서-경기99사9639.jpg",
+        "storageKey": "740260b3-3453-4c47-a8a3-41d7df1c1690-mock-점검신청서-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 67617,
+        "uploadedAt": "2026-04-21T05:34:57.971Z",
+        "category": "장비점검신청서"
+      },
+      {
+        "id": "1a60457e-a017-409a-bf4e-174f6d520bd3",
+        "originalName": "고소작업차.jpg",
+        "storageKey": "a55e1faa-5051-4955-805f-56b22a1ceb41-고소작업차.jpg",
+        "mimeType": "image/jpeg",
+        "size": 8742,
+        "uploadedAt": "2026-04-21T05:34:57.982Z",
+        "category": "장비실사사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.982Z"
+  },
+  {
+    "id": "5f4c48d9-0409-4a4d-9009-84f14d3ba90c",
+    "equipmentType": "고소작업차",
+    "vehicleNo": "경기44라9988",
+    "name": "25m 고소작업차 (구형)",
+    "model": "SKY250",
+    "manufacturer": "센코어테크",
+    "year": "2018",
+    "upperPartYear": "2018",
+    "serialNo": "SKC-2018-0250",
+    "capacity": "최대인양중량 200kg / 작업높이 25m",
+    "insuranceExpiry": "2026-04-11",
+    "inspectionExpiry": "2026-06-10",
+    "ndtExpiry": "2026-04-16",
+    "documents": [
+      {
+        "id": "b185d952-bbb0-4bb2-bd37-e8b7fd82ab74",
+        "originalName": "mock-등록원부-경기99사9639.jpg",
+        "storageKey": "876bbdd8-b09f-4221-839e-813475527372-mock-등록원부-경기99사9639.jpg",
+        "mimeType": "image/jpeg",
+        "size": 71252,
+        "uploadedAt": "2026-04-21T05:34:57.993Z",
+        "category": "건설기계등록증"
+      },
+      {
+        "id": "1f426851-d7a5-4e0e-b6d0-f2f27fd65fcb",
+        "originalName": "사업자등록증.jpg",
+        "storageKey": "35ee9ae1-ba70-4d0e-981a-0266459a82c3-사업자등록증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4092593,
+        "uploadedAt": "2026-04-21T05:34:58.067Z",
+        "category": "사업자등록증"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:58.067Z"
+  }
+]

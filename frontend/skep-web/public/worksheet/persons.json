@@ -1,0 +1,334 @@
+[
+  {
+    "id": "cf0ec262-c3df-472b-856b-6750666bb55e",
+    "name": "김철수",
+    "birth": "1985-03-15",
+    "phone": "010-1234-5678",
+    "address": "경기도 성남시 분당구 정자동 123",
+    "licenseNo": "12-34-567890-12",
+    "licenseType": "1종대형 / 건설기계조종사",
+    "company": "(주)스켑중기",
+    "roles": [
+      "조종원",
+      "작업지휘자"
+    ],
+    "photoKey": "",
+    "documents": [
+      {
+        "id": "f5792c7e-d6cd-40f8-85f3-4c12a3946ae1",
+        "originalName": "운전면허.jpg",
+        "storageKey": "b6c84d8f-5b24-41de-8734-632f2f073268-운전면허.jpg",
+        "mimeType": "image/jpeg",
+        "size": 31283,
+        "uploadedAt": "2026-04-21T05:34:57.013Z",
+        "category": "운전면허증",
+        "expiresAt": "2028-03-14"
+      },
+      {
+        "id": "442f6252-b5c2-42e8-9aa6-d43c538553f5",
+        "originalName": "면허운송.jpg",
+        "storageKey": "5736ab3b-841b-4e05-9bdd-258c8737f0a5-면허운송.jpg",
+        "mimeType": "image/jpeg",
+        "size": 217040,
+        "uploadedAt": "2026-04-21T05:34:57.027Z",
+        "category": "건설기계조종사면허",
+        "expiresAt": "2027-06-30"
+      },
+      {
+        "id": "df89bd9a-136b-4b1b-a6dd-da2922f1ce0d",
+        "originalName": "화물운송.jpg",
+        "storageKey": "0dcaa9c6-184c-4b1d-9c6b-c67b8c1c31b8-화물운송.jpg",
+        "mimeType": "image/jpeg",
+        "size": 26198,
+        "uploadedAt": "2026-04-21T05:34:57.038Z",
+        "category": "화물운송자격증",
+        "expiresAt": "2027-12-31"
+      },
+      {
+        "id": "aac7a45d-fd68-4a1e-aac6-6b5bc6c0d608",
+        "originalName": "mock-면허경력-김철수.jpg",
+        "storageKey": "b0e553fc-9fa6-4ccd-a1a3-5eb179989fad-mock-면허경력-김철수.jpg",
+        "mimeType": "image/jpeg",
+        "size": 64206,
+        "uploadedAt": "2026-04-21T05:34:57.047Z",
+        "category": "면허증(경력)",
+        "expiresAt": "2027-12-31"
+      },
+      {
+        "id": "e93cf435-1948-4689-b4f0-1a5cb46a8137",
+        "originalName": "안전보건교육 이수증.jpg",
+        "storageKey": "4fcd51a3-0951-4e27-9c27-1b1adf03e034-안전보건교육 이수증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 26239,
+        "uploadedAt": "2026-04-21T05:34:57.058Z",
+        "category": "기초안전보건교육이수증",
+        "expiresAt": "2026-12-31"
+      },
+      {
+        "id": "ab7a84f1-d9ee-4956-b7df-c52d056d6328",
+        "originalName": "mock-조종사교육-김철수.jpg",
+        "storageKey": "3fd1481b-2836-4bed-86dc-b25f11d6d956-mock-조종사교육-김철수.jpg",
+        "mimeType": "image/jpeg",
+        "size": 73010,
+        "uploadedAt": "2026-04-21T05:34:57.069Z",
+        "category": "조종사안전교육이수증",
+        "expiresAt": "2028-01-09"
+      },
+      {
+        "id": "3d29bc15-42be-4f09-a43e-e5c8c5dd5b15",
+        "originalName": "mock-경력증명-김철수.jpg",
+        "storageKey": "ee08c626-3ebb-41d6-a87f-48f44ac97a22-mock-경력증명-김철수.jpg",
+        "mimeType": "image/jpeg",
+        "size": 59432,
+        "uploadedAt": "2026-04-21T05:34:57.080Z",
+        "category": "경력증명서"
+      },
+      {
+        "id": "d3b3b9db-902f-4753-b795-e25e815e4e1e",
+        "originalName": "mock-증명사진-김철수.jpg",
+        "storageKey": "1088659e-2d3e-49e8-8195-8f9f820cd304-mock-증명사진-김철수.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4662,
+        "uploadedAt": "2026-04-21T05:34:57.089Z",
+        "category": "증명사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.089Z"
+  },
+  {
+    "id": "95fa39d1-bbd4-4500-8307-628015a39937",
+    "name": "장현주",
+    "birth": "1965-03-12",
+    "phone": "010-2345-6789",
+    "address": "충청남도 아산시 법곡길 8, 105동 404호",
+    "company": "(주)스켑중기",
+    "roles": [
+      "유도원",
+      "신호수"
+    ],
+    "documents": [
+      {
+        "id": "7627d033-4f52-4cbe-ac3d-60ef404a20ae",
+        "originalName": "안전보건교육 이수증.jpg",
+        "storageKey": "dd598da3-75bb-4708-bc60-eb463b1d06d0-안전보건교육 이수증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 26239,
+        "uploadedAt": "2026-04-21T05:34:57.099Z",
+        "category": "특성화/특별교육이수증",
+        "expiresAt": "2026-07-01"
+      },
+      {
+        "id": "6cf6def5-03bb-448a-b0e7-e24193491391",
+        "originalName": "안전보건교육 이수증.jpg",
+        "storageKey": "91ad9a28-337a-4510-9c0c-9435bad29c6c-안전보건교육 이수증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 26239,
+        "uploadedAt": "2026-04-21T05:34:57.107Z",
+        "category": "기초안전보건교육이수증",
+        "expiresAt": "2026-12-31"
+      },
+      {
+        "id": "da819eb9-be18-4b16-94b2-ec27e360f5c4",
+        "originalName": "mock-경력증명-장현주.jpg",
+        "storageKey": "85592ebf-91b4-4801-8479-90a1994cc51a-mock-경력증명-장현주.jpg",
+        "mimeType": "image/jpeg",
+        "size": 53948,
+        "uploadedAt": "2026-04-21T05:34:57.118Z",
+        "category": "경력증명서"
+      },
+      {
+        "id": "c4e589bd-8262-4133-9be2-246a822a0e5a",
+        "originalName": "mock-증명사진-장현주.jpg",
+        "storageKey": "30b553f3-ce4f-4497-a126-2df7bb84e9ab-mock-증명사진-장현주.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4751,
+        "uploadedAt": "2026-04-21T05:34:57.128Z",
+        "category": "증명사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.129Z"
+  },
+  {
+    "id": "7b1492d9-1b8a-4ed9-9047-0d9c5874597a",
+    "name": "김윤자",
+    "birth": "1965-01-22",
+    "phone": "010-3456-7890",
+    "address": "충청남도 천안시 동남구 고재 13길 13-2, 5동 201호",
+    "company": "(주)스켑중기",
+    "roles": [
+      "화기감시자"
+    ],
+    "documents": [
+      {
+        "id": "7c339684-4d5b-4f11-b373-1b74c28ed63c",
+        "originalName": "안전보건교육 이수증.jpg",
+        "storageKey": "cc814a10-8068-46c9-bd4c-33ecb1eb5050-안전보건교육 이수증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 26239,
+        "uploadedAt": "2026-04-21T05:34:57.139Z",
+        "category": "특성화/특별교육이수증",
+        "expiresAt": "2026-07-01"
+      },
+      {
+        "id": "2e285bc5-1f79-4170-bd98-66307573c2b0",
+        "originalName": "mock-경력증명-김윤자.jpg",
+        "storageKey": "33db6ef6-56d4-43be-82a4-5522ca9479da-mock-경력증명-김윤자.jpg",
+        "mimeType": "image/jpeg",
+        "size": 54162,
+        "uploadedAt": "2026-04-21T05:34:57.154Z",
+        "category": "경력증명서"
+      },
+      {
+        "id": "77ffb211-9c3c-44ec-8a66-fbd134329844",
+        "originalName": "mock-증명사진-김윤자.jpg",
+        "storageKey": "a72997a8-c6d4-4d9c-a02e-9bb795e7ac3d-mock-증명사진-김윤자.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4777,
+        "uploadedAt": "2026-04-21T05:34:57.165Z",
+        "category": "증명사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.165Z"
+  },
+  {
+    "id": "a4baff1e-ddc5-445b-9c23-04d9216a0610",
+    "name": "송화석",
+    "birth": "1972-08-09",
+    "phone": "010-4567-8901",
+    "address": "서울특별시 강남구 테헤란로 123",
+    "company": "(주)스켑중기",
+    "roles": [
+      "작업지휘자",
+      "안전관리자"
+    ],
+    "documents": [
+      {
+        "id": "1ca6fcd2-5928-406c-84c9-a63335a9431a",
+        "originalName": "안전보건교육 이수증.jpg",
+        "storageKey": "ad0c1eb4-8bcf-4cee-9be3-d9434d4c697b-안전보건교육 이수증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 26239,
+        "uploadedAt": "2026-04-21T05:34:57.176Z",
+        "category": "기초안전보건교육이수증",
+        "expiresAt": "2026-12-31"
+      },
+      {
+        "id": "9b0c8c90-690c-4995-a0f6-ee2b9d0b53e5",
+        "originalName": "mock-경력증명-송화석.jpg",
+        "storageKey": "24060f62-b268-4d1b-98f0-cd9d1af5707e-mock-경력증명-송화석.jpg",
+        "mimeType": "image/jpeg",
+        "size": 53969,
+        "uploadedAt": "2026-04-21T05:34:57.187Z",
+        "category": "경력증명서"
+      },
+      {
+        "id": "bc84e229-6207-4a0b-97d7-ea130429aa6f",
+        "originalName": "mock-증명사진-송화석.jpg",
+        "storageKey": "cc3ab6a5-a9d6-4aa4-88dc-c07425a853d3-mock-증명사진-송화석.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4806,
+        "uploadedAt": "2026-04-21T05:34:57.198Z",
+        "category": "증명사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.198Z"
+  },
+  {
+    "id": "3842b22d-6605-4e46-8f4f-dbcab9cab193",
+    "name": "박영수",
+    "birth": "1978-11-03",
+    "phone": "010-5678-9012",
+    "address": "인천광역시 남동구 구월동 456",
+    "licenseNo": "22-44-123456-33",
+    "licenseType": "1종대형",
+    "company": "(주)엄마건기",
+    "roles": [
+      "조종원"
+    ],
+    "documents": [
+      {
+        "id": "effbb591-eb98-4142-ae04-fb5fae03ebda",
+        "originalName": "운전면허.jpg",
+        "storageKey": "a945b008-bb9b-4cd6-8bf2-77f465d4056d-운전면허.jpg",
+        "mimeType": "image/jpeg",
+        "size": 31283,
+        "uploadedAt": "2026-04-21T05:34:57.209Z",
+        "category": "운전면허증",
+        "expiresAt": "2029-11-02"
+      },
+      {
+        "id": "33a28d2f-84b4-458a-8577-f8c819b3c7be",
+        "originalName": "mock-면허경력-박영수.jpg",
+        "storageKey": "a311d283-e7a6-4e87-bfa7-75c9883d7de7-mock-면허경력-박영수.jpg",
+        "mimeType": "image/jpeg",
+        "size": 62780,
+        "uploadedAt": "2026-04-21T05:34:57.218Z",
+        "category": "면허증(경력)",
+        "expiresAt": "2027-12-31"
+      },
+      {
+        "id": "f6ac10b4-89a0-4bf5-844b-da068b3cf0bf",
+        "originalName": "mock-조종사교육-박영수.jpg",
+        "storageKey": "0971bdf7-9324-4b4c-a8a0-d2fa6e553dc9-mock-조종사교육-박영수.jpg",
+        "mimeType": "image/jpeg",
+        "size": 72005,
+        "uploadedAt": "2026-04-21T05:34:57.231Z",
+        "category": "조종사안전교육이수증",
+        "expiresAt": "2028-01-09"
+      },
+      {
+        "id": "b499978f-a8cc-487f-8038-1315dbd940c0",
+        "originalName": "mock-증명사진-박영수.jpg",
+        "storageKey": "c18fa84f-8faa-4125-a0a3-cefdc50f564b-mock-증명사진-박영수.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4659,
+        "uploadedAt": "2026-04-21T05:34:57.241Z",
+        "category": "증명사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.241Z"
+  },
+  {
+    "id": "64f07996-7e53-4b83-beb5-26b4d5ca19cc",
+    "name": "이상철",
+    "birth": "1970-05-25",
+    "phone": "010-6789-0123",
+    "address": "경기도 수원시 영통구 매탄동 789",
+    "company": "(주)스켑중기",
+    "roles": [
+      "신호수",
+      "유도원"
+    ],
+    "documents": [
+      {
+        "id": "e1ec88d0-4519-4675-b2d1-a25320d99ae6",
+        "originalName": "안전보건교육 이수증.jpg",
+        "storageKey": "c9f4e917-a162-404a-bc7c-e4c51d28ea71-안전보건교육 이수증.jpg",
+        "mimeType": "image/jpeg",
+        "size": 26239,
+        "uploadedAt": "2026-04-21T05:34:57.252Z",
+        "category": "특성화/특별교육이수증",
+        "expiresAt": "2026-08-15"
+      },
+      {
+        "id": "ca6a61ea-dc0b-480a-9278-b3b0ccae0c69",
+        "originalName": "mock-경력증명-이상철.jpg",
+        "storageKey": "a42185af-fd79-4bb0-97bb-a721b24e9221-mock-경력증명-이상철.jpg",
+        "mimeType": "image/jpeg",
+        "size": 53498,
+        "uploadedAt": "2026-04-21T05:34:57.264Z",
+        "category": "경력증명서"
+      },
+      {
+        "id": "4780a6db-76de-471d-bf82-1216a1914263",
+        "originalName": "mock-증명사진-이상철.jpg",
+        "storageKey": "206adb87-691c-429b-a343-a84a3f1f4db5-mock-증명사진-이상철.jpg",
+        "mimeType": "image/jpeg",
+        "size": 4755,
+        "uploadedAt": "2026-04-21T05:34:57.274Z",
+        "category": "증명사진"
+      }
+    ],
+    "createdAt": "2026-04-21T05:34:57.274Z"
+  }
+]
