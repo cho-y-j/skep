@@ -224,6 +224,12 @@ public class EquipmentService {
         return builder.build();
     }
 
+    public void deleteEquipment(UUID id) {
+        Equipment equipment = equipmentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Equipment not found: " + id));
+        equipmentRepository.delete(equipment);
+    }
+
     private EquipmentResponse mapToResponse(Equipment equipment) {
         return EquipmentResponse.builder()
                 .id(equipment.getId())

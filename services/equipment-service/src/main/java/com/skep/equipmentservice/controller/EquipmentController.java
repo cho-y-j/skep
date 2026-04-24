@@ -70,4 +70,10 @@ public class EquipmentController {
         EquipmentStatusResponse status = equipmentService.checkEquipmentStatus(id);
         return ResponseEntity.ok(status);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteEquipment(@PathVariable UUID id) {
+        equipmentService.deleteEquipment(id);
+        return ResponseEntity.noContent().build();
+    }
 }

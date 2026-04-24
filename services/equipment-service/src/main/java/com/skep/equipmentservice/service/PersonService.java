@@ -156,6 +156,12 @@ public class PersonService {
         return mapToResponse(savedPerson);
     }
 
+    public void deletePerson(UUID id) {
+        Person person = personRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Person not found: " + id));
+        personRepository.delete(person);
+    }
+
     private PersonResponse mapToResponse(Person person) {
         return PersonResponse.builder()
                 .id(person.getId())

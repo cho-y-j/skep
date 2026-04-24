@@ -59,4 +59,9 @@ public class MaintenanceInspectionService {
         inspection.setNotes(request.getNotes());
         return maintenanceInspectionRepository.save(inspection);
     }
+
+    public void deleteInspection(UUID id) {
+        MaintenanceInspection inspection = getInspectionById(id);
+        maintenanceInspectionRepository.delete(inspection);
+    }
 }

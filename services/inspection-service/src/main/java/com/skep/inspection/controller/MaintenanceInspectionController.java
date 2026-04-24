@@ -50,4 +50,10 @@ public class MaintenanceInspectionController {
         MaintenanceInspection inspection = maintenanceInspectionService.updateInspection(id, request);
         return ResponseEntity.ok(inspection);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteInspection(@PathVariable UUID id) {
+        maintenanceInspectionService.deleteInspection(id);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -69,4 +69,10 @@ public class PersonController {
         PersonResponse response = personService.recordSafetyTraining(id, date);
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePerson(@PathVariable UUID id) {
+        personService.deletePerson(id);
+        return ResponseEntity.noContent().build();
+    }
 }

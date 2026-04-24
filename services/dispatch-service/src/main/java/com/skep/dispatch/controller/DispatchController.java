@@ -66,6 +66,12 @@ public class DispatchController {
         return ResponseEntity.ok(plans);
     }
 
+    @DeleteMapping("/plans/{id}")
+    public ResponseEntity<Void> deletePlan(@PathVariable UUID id) {
+        deploymentPlanService.deletePlan(id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ===== Daily Rosters =====
     @PostMapping("/rosters")
     public ResponseEntity<DailyRoster> submitRoster(@RequestBody CreateDailyRosterRequest request) {
@@ -113,6 +119,22 @@ public class DispatchController {
     ) {
         DailyRoster roster = dailyRosterService.rejectRoster(id, request.getNotes());
         return ResponseEntity.ok(roster);
+    }
+
+    // 일반 명부 업데이트 (일반 필드 수정)
+    @PutMapping("/rosters/{id}")
+    public ResponseEntity<DailyRoster> updateRoster(
+        @PathVariable UUID id,
+        @RequestBody CreateDailyRosterRequest request
+    ) {
+        DailyRoster roster = dailyRosterService.updateRoster(id, request);
+        return ResponseEntity.ok(roster);
+    }
+
+    @DeleteMapping("/rosters/{id}")
+    public ResponseEntity<Void> deleteRoster(@PathVariable UUID id) {
+        dailyRosterService.deleteRoster(id);
+        return ResponseEntity.noContent().build();
     }
 
     // ===== Work Records =====

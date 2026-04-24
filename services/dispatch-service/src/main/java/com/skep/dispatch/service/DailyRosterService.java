@@ -78,4 +78,18 @@ public class DailyRosterService {
     public List<DailyRoster> getRostersByStatus(String status) {
         return dailyRosterRepository.findByStatus(status);
     }
+
+    public DailyRoster updateRoster(UUID id, CreateDailyRosterRequest request) {
+        DailyRoster roster = getRosterById(id);
+        if ("APPROVED".equals(roster.getStatus()) || "REJECTED".equals(roster.getStatus())) {
+            throw new IllegalStateException("승인/거절된 명부는 수정할 수 없습니다");
+        }
+        if (request.getNotes() != null) roster.setNotes(request.getNotes());
+        return dailyRosterRepository.save(roster);
+    }
+
+    public void deleteRoster(UUID id) {
+        DailyRoster roster = getRosterById(id);
+        dailyRosterRepository.delete(roster);
+    }
 }

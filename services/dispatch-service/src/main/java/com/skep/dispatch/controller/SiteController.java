@@ -46,4 +46,10 @@ public class SiteController {
         Site updated = siteService.updateSite(id, site);
         return ResponseEntity.ok(updated);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteSite(@PathVariable UUID id) {
+        siteService.deleteSite(id);
+        return ResponseEntity.noContent().build();
+    }
 }

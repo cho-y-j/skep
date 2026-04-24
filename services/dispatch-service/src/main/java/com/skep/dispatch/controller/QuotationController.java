@@ -80,4 +80,20 @@ public class QuotationController {
         Quotation quotation = quotationService.rejectQuotation(id);
         return ResponseEntity.ok(quotation);
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Quotation> getQuotation(@PathVariable UUID id) {
+        Quotation q = quotationService.getQuotationById(id);
+        return ResponseEntity.ok(q);
+    }
+
+    // 견적 일반 수정 (DRAFT 상태일 때만)
+    @PutMapping("/{id}")
+    public ResponseEntity<Quotation> updateQuotation(
+        @PathVariable UUID id,
+        @RequestBody Quotation quotation
+    ) {
+        Quotation updated = quotationService.updateQuotation(id, quotation);
+        return ResponseEntity.ok(updated);
+    }
 }

@@ -49,4 +49,9 @@ public class SiteService {
         if (request.getStatus() != null) site.setStatus(request.getStatus());
         return siteRepository.save(site);
     }
+
+    public void deleteSite(UUID id) {
+        Site site = getSiteById(id);
+        siteRepository.delete(site);
+    }
 }

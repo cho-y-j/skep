@@ -8,8 +8,12 @@ spring:
     name: api-gateway
   profiles:
     active: dev
+  codec:
+    max-in-memory-size: 100MB
   cloud:
     gateway:
+      httpclient:
+        response-timeout: 180s
       routes:
         - id: auth-service
           uri: http://auth-service:${AUTH_SERVICE_PORT:9081}
@@ -19,7 +23,7 @@ spring:
         - id: document-service
           uri: http://document-service:${DOCUMENT_SERVICE_PORT:9082}
           predicates:
-            - Path=/api/documents/**
+            - Path=/api/documents/**,/api/worksheet/**
 
         - id: equipment-service
           uri: http://equipment-service:${EQUIPMENT_SERVICE_PORT:9083}

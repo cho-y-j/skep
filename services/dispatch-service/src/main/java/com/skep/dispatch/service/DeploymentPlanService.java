@@ -71,4 +71,9 @@ public class DeploymentPlanService {
         plan.setNotes(notes);
         return deploymentPlanRepository.save(plan);
     }
+
+    public void deletePlan(UUID id) {
+        DeploymentPlan plan = getPlanById(id); // 없으면 EntityNotFoundException
+        deploymentPlanRepository.delete(plan);
+    }
 }

@@ -109,4 +109,14 @@ public class QuotationService {
         return quotationRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Quotation not found: " + id));
     }
+
+    public Quotation updateQuotation(UUID id, Quotation patch) {
+        Quotation existing = getQuotationById(id);
+        if (!"DRAFT".equals(existing.getStatus())) {
+            throw new RuntimeException("DRAFT 상태의 견적만 수정 가능합니다. 현재: " + existing.getStatus());
+        }
+        if (patch.getTotalAmount() != null) existing.setTotalAmount(patch.getTotalAmount());
+        if (patch.getNotes() != null) existing.setNotes(patch.getNotes());
+        return quotationRepository.save(existing);
+    }
 }
