@@ -226,6 +226,10 @@ services:
       VERIFY_API_EMAIL: ${VERIFY_API_EMAIL:-_skep_internal_svc_7f3a@system.local}
       VERIFY_API_PASSWORD: ${VERIFY_API_PASSWORD:-Xk9mN2vRpL5wQ8jF1@@}
 
+      # OnlyOffice — JWT 시크릿은 onlyoffice 컨테이너 local.json 과 반드시 동일해야 함
+      ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-change_me_jwt}
+      ONLYOFFICE_INTERNAL_DOC_SERVICE: http://document-service:${DOCUMENT_SERVICE_PORT:-8082}
+
       # Logging
       LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
 
@@ -246,6 +250,33 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  # OnlyOffice Document Server — Word/Excel/PPT 실시간 편집기
+  # JWT_SECRET env는 entrypoint 가 local.json 의 inbox/outbox/session 에 자동 주입
+  # document-service 의 ONLYOFFICE_JWT_SECRET 과 반드시 동일해야 서명 검증 성공
+  onlyoffice:
+    image: onlyoffice/documentserver:8.1
+    container_name: skep-onlyoffice
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-change_me_jwt}
+      JWT_HEADER: Authorization
+      JWT_IN_BODY: "false"
+    ports:
+      - "${ONLYOFFICE_PORT:-18000}:80"
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+      - onlyoffice_log:/var/log/onlyoffice
+      - onlyoffice_lib:/var/lib/onlyoffice
+    networks:
+      - skep-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 -O /dev/null http://localhost/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   equipment-service:
     build:
@@ -525,4 +556,10 @@ volumes:
   redis_data:
     driver: local
   document_uploads:
+    driver: local
+  onlyoffice_data:
+    driver: local
+  onlyoffice_log:
+    driver: local
+  onlyoffice_lib:
     driver: local

@@ -39,10 +39,10 @@ export default function EquipmentStatusPage() {
     queryFn: () => equipmentApi.getTypes(),
   });
 
+  // 장비 공급사 + 설치협력사(BP) 모두 표시
   const suppliersQuery = useQuery({
-    queryKey: queryKeys.companies.byType(CompanyType.SUPPLIER),
-    queryFn: () =>
-      companiesApi.getByType(CompanyType.SUPPLIER, { size: 200 }),
+    queryKey: queryKeys.companies.all({ size: 500 }),
+    queryFn: () => companiesApi.getAll({ size: 500 }),
   });
 
   const createMutation = useMutation({

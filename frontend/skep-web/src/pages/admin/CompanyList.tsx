@@ -68,8 +68,11 @@ export default function CompanyList() {
   });
 
   const filteredData = useMemo(() => {
-    let data = companiesQuery.data?.content ?? [];
-    if (filterType) data = data.filter((c) => c.type === filterType);
+    // 백엔드가 PageResponse 대신 plain array를 돌려주는 경우도 허용
+    const raw = companiesQuery.data as any;
+    let data: Company[] = Array.isArray(raw) ? raw : (raw?.content ?? []);
+    // 백엔드 필드명은 companyType — type 둘 다 허용
+    if (filterType) data = data.filter((c: any) => (c.companyType ?? c.type) === filterType);
     if (filterStatus) data = data.filter((c) => c.status === filterStatus);
     return data;
   }, [companiesQuery.data, filterType, filterStatus]);
